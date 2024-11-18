@@ -2,21 +2,18 @@
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../lib/forge-std/src/Test.sol";
+import { Test, console2 } from "../../lib/forge-std/src/Test.sol";
+import { Pausable } from "../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
-import { Pausable } from "../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import { MockSmartM } from "../utils/Mocks.sol";
+import { UCTokenHarness } from "../utils/UCTokenHarness.sol";
+import { RegistryAccess } from "../utils/RegistryAccess.sol";
 
-import { IUCToken } from "../src/interfaces/IUCToken.sol";
+import { UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
 
-import { MockM } from "./utils/Mocks.sol";
-import { UCTokenHarness } from "./utils/UCTokenHarness.sol";
-import { RegistryAccess } from "./utils/RegistryAccess.sol";
-
-import { UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "../src/constants.sol";
+import { IUCToken } from "../../src/token/interfaces/IUCToken.sol";
 
 contract UCTokenTests is Test {
-    uint256 internal constant _EXP_SCALED_ONE = 1e12;
-
     address internal _treasury = makeAddr("treasury");
 
     address internal _admin = makeAddr("admin");
@@ -31,13 +28,12 @@ contract UCTokenTests is Test {
 
     address[] internal _accounts = [_alice, _bob, _charlie, _david];
 
-    MockM internal _mToken;
+    MockSmartM internal _smartMToken;
     UCTokenHarness internal _ucToken;
     RegistryAccess internal _registryAccess;
 
     function setUp() external {
-        _mToken = new MockM();
-        _mToken.setCurrentIndex(uint128(_EXP_SCALED_ONE));
+        _smartMToken = new MockSmartM();
 
         _registryAccess = new RegistryAccess();
         _resetInitializerImplementation(address(_registryAccess));
@@ -45,34 +41,28 @@ contract UCTokenTests is Test {
 
         _ucToken = new UCTokenHarness();
         _resetInitializerImplementation(address(_ucToken));
-        _ucToken.initialize(address(_mToken), address(_registryAccess), _treasury);
+        _ucToken.initialize(address(_smartMToken), address(_registryAccess));
 
-        // Set pauser/unpauser role
+        // Set pauser/unpauser role.
         vm.prank(_admin);
         _registryAccess.grantRole(UCT_PAUSE_UNPAUSE, _pauser);
 
-        // Allow accounts to unwrap and fund with $M
+        // Fund accounts with SmartM tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _mToken.setBalanceOf(_accounts[i], 10e6);
+            _smartMToken.setBalanceOf(_accounts[i], 10e6);
 
             vm.prank(_admin);
             _registryAccess.grantRole(UCT_UNWRAP, _accounts[i]);
         }
-
-        vm.prank(_treasury);
-        _mToken.approve(_treasury, type(uint256).max);
-
-        // _mToken.setCurrentIndex(_currentIndex = 1_100000068703);
     }
 
     /* ============ initialization ============ */
     function test_init() external view {
-        assertEq(_ucToken.mToken(), address(_mToken));
+        assertEq(_ucToken.smartMToken(), address(_smartMToken));
         assertEq(_ucToken.registryAccess(), address(_registryAccess));
-        assertEq(_ucToken.treasury(), _treasury);
         assertEq(_ucToken.name(), "UCToken");
         assertEq(_ucToken.symbol(), "UCT");
-        assertEq(_ucToken.decimals(), 6);
+        assertEq(_ucToken.decimals(), 18);
     }
 
     /* ============ wrap ============ */
@@ -80,56 +70,58 @@ contract UCTokenTests is Test {
         vm.prank(_alice);
         _ucToken.wrap(_alice);
 
-        assertEq(_mToken.balanceOf(_alice), 0);
-        assertEq(_mToken.balanceOf(_treasury), 10e6);
+        assertEq(_smartMToken.balanceOf(_alice), 0);
+        assertEq(_smartMToken.balanceOf(address(_ucToken)), 10e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 10e6);
+        assertEq(_ucToken.balanceOf(_alice), 10e18);
     }
 
     function test_wrap() external {
         vm.prank(_alice);
         _ucToken.wrap(_alice, 5e6);
 
-        assertEq(_mToken.balanceOf(_alice), 5e6);
-        assertEq(_mToken.balanceOf(_treasury), 5e6);
+        assertEq(_smartMToken.balanceOf(_alice), 5e6);
+        assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 5e6);
+        assertEq(_ucToken.balanceOf(_alice), 5e18);
     }
 
     function test_wrapWithPermit() external {
         vm.prank(_bob);
         _ucToken.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0));
 
-        assertEq(_mToken.balanceOf(_alice), 10e6);
-        assertEq(_mToken.balanceOf(_treasury), 5e6);
+        assertEq(_smartMToken.balanceOf(_alice), 10e6);
+        assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
+        assertEq(_ucToken.balanceOf(_alice), 5e18);
 
         assertEq(_ucToken.balanceOf(_bob), 0);
     }
 
     /* ============ unwrap ============ */
-
     function test_unwrap() external {
-        vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        _ucToken.internalWrap(_alice, _alice, 10e6);
 
         vm.prank(_alice);
-        _ucToken.unwrap(_alice, 5e6);
+        _ucToken.unwrap(_alice, 5e18);
 
-        assertEq(_mToken.balanceOf(_alice), 5e6);
-        assertEq(_mToken.balanceOf(_treasury), 5e6);
+        assertEq(_smartMToken.balanceOf(_alice), 5e6);
+        assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 5e6);
+        assertEq(_ucToken.balanceOf(_alice), 5e18);
     }
 
     function test_unwrap_wholeBalance() external {
-        vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        _ucToken.internalWrap(_alice, _alice, 10e6);
+
+        assertEq(_smartMToken.balanceOf(_alice), 0);
+        assertEq(_smartMToken.balanceOf(address(_ucToken)), 10e6);
+        assertEq(_ucToken.balanceOf(_alice), 10e18);
 
         vm.prank(_alice);
         _ucToken.unwrap(_alice);
 
-        assertEq(_mToken.balanceOf(_alice), 10e6);
-        assertEq(_mToken.balanceOf(_treasury), 0);
+        assertEq(_smartMToken.balanceOf(_alice), 10e6);
+        assertEq(_smartMToken.balanceOf(address(_ucToken)), 0);
 
         assertEq(_ucToken.balanceOf(_alice), 0);
     }
@@ -271,7 +263,7 @@ contract UCTokenTests is Test {
 
         vm.prank(_alice);
         uint256 res = _ucToken.wrap(_alice, 10e6);
-        assertEq(res, 10e6);
+        assertEq(res, 10e18);
 
         assertEq(_ucToken.isBlacklisted(_alice), false);
     }
@@ -290,24 +282,21 @@ contract UCTokenTests is Test {
         _ucToken.unBlacklist(address(0));
     }
 
-    /* ============ yield ============ */
-    function test_totalAccruedYield() external {
-        assertEq(_ucToken.totalAccruedYield(), 0);
+    function test_blacklist_sameValue() external {
+        vm.prank(_admin);
+        _ucToken.blacklist(_alice);
 
-        vm.prank(_treasury);
-        _mToken.startEarning();
+        vm.expectRevert(IUCToken.SameValue.selector);
 
-        vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        vm.prank(_admin);
+        _ucToken.blacklist(_alice);
+    }
 
-        vm.prank(_bob);
-        _ucToken.wrap(_bob, 10e6);
+    function test_unBlacklist_sameValue() external {
+        vm.expectRevert(IUCToken.SameValue.selector);
 
-        assertEq(_ucToken.totalAccruedYield(), 0);
-
-        _mToken.setCurrentIndex(11e11);
-
-        assertEq(_ucToken.totalAccruedYield(), 2e6);
+        vm.prank(_admin);
+        _ucToken.unBlacklist(_alice);
     }
 
     /* ============ utils ============ */

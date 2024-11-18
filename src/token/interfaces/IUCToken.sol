@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.26;
 
-import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {
+    IERC20Metadata
+} from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
  * @title  UCT Extension.
@@ -23,22 +25,22 @@ interface IUCToken is IERC20Metadata {
     /// @notice Emitted when action is performed by unauthorized account.
     error NotAuthorized();
 
+    /// @notice Emitted when blacklist/unBlacklist action is performed on the account that is already in desired state.
+    error SameValue();
+
     /// @notice Emitted if account is 0x0.
     error ZeroAddress();
 
-    /// @notice Emitted if M Token is 0x0.
-    error ZeroMToken();
+    /// @notice Emitted if SmartM Token is 0x0.
+    error ZeroSmartMToken();
 
     /// @notice Emitted if Registry Access is 0x0.
     error ZeroRegistryAccess();
 
-    /// @notice Emitted if Treasury is 0x0.
-    error ZeroTreasury();
-
     /* ============ Interactive Functions ============ */
 
     /**
-     * @notice Wraps `amount` M from the caller into UCT for `recipient`.
+     * @notice Wraps `amount` SmartM from the caller into UCT for `recipient`.
      * @param  recipient The account receiving the minted UCT.
      * @param  amount    The amount of M deposited.
      * @return           The amount of UCT minted.
@@ -46,21 +48,21 @@ interface IUCToken is IERC20Metadata {
     function wrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Wraps all the M from the caller into UCT for `recipient`.
+     * @notice Wraps all the SmartM from the caller into UCT for `recipient`.
      * @param  recipient The account receiving the minted UCT.
      * @return           The amount of UCT minted.
      */
     function wrap(address recipient) external returns (uint256);
 
     /**
-     * @notice Wraps `amount` M from the caller into UCT for `recipient`, using a permit.
+     * @notice Wraps `amount` SmartM from the caller into UCT for `recipient`, using a permit.
      * @param  recipient The account receiving the minted UCT.
-     * @param  amount    The amount of M deposited.
+     * @param  amount    The amount of SmartM deposited.
      * @param  deadline  The last timestamp where the signature is still valid.
      * @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  s         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-     * @return wrapped   The amount of UCT minted.
+     * @return           The amount of UCT minted.
      */
     function wrapWithPermit(
         address recipient,
@@ -72,17 +74,17 @@ interface IUCToken is IERC20Metadata {
     ) external returns (uint256);
 
     /**
-     * @notice Unwraps `amount` UCT from the caller into M for `recipient`.
-     * @param  recipient The account receiving the withdrawn M.
+     * @notice Unwraps `amount` UCT from the caller into SmartM for `recipient`.
+     * @param  recipient The account receiving the withdrawn SmartM.
      * @param  amount    The amount of UCT burned.
-     * @return           The amount of M withdrawn.
+     * @return           The amount of SmartM withdrawn.
      */
     function unwrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Unwraps all the UCT from the caller into M for `recipient`.
-     * @param  recipient The account receiving the withdrawn M.
-     * @return           The amount of M withdrawn.
+     * @notice Unwraps all the UCT from the caller into SmartM for `recipient`.
+     * @param  recipient The account receiving the withdrawn SmartM.
+     * @return           The amount of SmartM withdrawn.
      */
     function unwrap(address recipient) external returns (uint256);
 
@@ -110,18 +112,12 @@ interface IUCToken is IERC20Metadata {
 
     /* ============ View/Pure Functions ============ */
 
-    /// @notice The accrued yield of M locked in the M extension.
-    function totalAccruedYield() external view returns (uint256);
-
     /// @notice Returns wheather account is blacklisted.
     function isBlacklisted(address account) external view returns (bool);
 
-    /// @notice Returns the M Token address.
-    function mToken() external view returns (address);
+    /// @notice Returns the SmartM Token address.
+    function smartMToken() external view returns (address);
 
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);
-
-    /// @notice Returns the Treasury address.
-    function treasury() external view returns (address);
 }

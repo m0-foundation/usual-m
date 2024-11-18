@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 
-// TODO: Delete later,
 // COPY from Usual repo https://github.com/usual-dao/pegasus/blob/develop/packages/solidity/src/registry/RegistryAccess.sol
 pragma solidity 0.8.26;
 
@@ -8,7 +7,7 @@ import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 
-import { IRegistryAccess } from "../../src/interfaces/IRegistryAccess.sol";
+import { IRegistryAccess } from "../../src/token/interfaces/IRegistryAccess.sol";
 
 /// @notice  This contract is used to manage the access to function call
 /// @title   RegistryAccess contract
