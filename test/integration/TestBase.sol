@@ -13,7 +13,6 @@ import { IUCToken } from "../../src/token/interfaces/IUCToken.sol";
 import { IRegistryAccess } from "../../src/token/interfaces/IRegistryAccess.sol";
 
 import { UCToken } from "../../src/token/UCToken.sol";
-import { RegistryAccess } from "../utils/RegistryAccess.sol";
 
 import { UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
 
@@ -29,7 +28,9 @@ contract TestBase is Test {
     // Large SmartM holder on Ethereum Mainnet
     address internal constant _smartMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
 
-    address internal _admin = makeAddr("admin");
+    IRegistryAccess internal constant _registryAccess = IRegistryAccess(0x0D374775E962c3608B8F0A4b8B10567DF739bb56);
+    address internal _admin = _registryAccess.defaultAdmin();
+
     address internal _treasury = makeAddr("treasury");
 
     address internal _alice = makeAddr("alice");
@@ -47,8 +48,6 @@ contract TestBase is Test {
 
     address[] internal _accounts = [_alice, _bob, _carol, _dave, _eric, _frank, _grace, _henry, _ivan, _judy];
 
-    address internal _registryAccessImplementation;
-    address internal _registryAccess;
     address internal _ucTokenImplementation;
     IUCToken internal _ucToken;
 
@@ -121,10 +120,6 @@ contract TestBase is Test {
     }
 
     function _deployComponents() internal {
-        _registryAccessImplementation = address(new RegistryAccess());
-        bytes memory registryData = abi.encodeWithSignature("initialize(address)", _admin);
-        _registryAccess = address(new TransparentUpgradeableProxy(_registryAccessImplementation, _admin, registryData));
-
         _ucTokenImplementation = address(new UCToken());
         bytes memory ucTokenData = abi.encodeWithSignature(
             "initialize(address,address)",
