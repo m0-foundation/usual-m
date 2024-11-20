@@ -202,6 +202,9 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         address recipient,
         uint256 amount
     ) internal returns (uint256 wrapped) {
+        // TODO: Consider adding a check for the maximum amount of UCToken that can be minted.
+        // if (amount > type(uint216).max) revert AmountExceedsMaxAllowed();
+
         // NOTE: The behavior of `ISmartMTokenLike.transferFrom` is known, so its return can be ignored.
         ISmartMTokenLike(smartMToken_).transferFrom(account, address(this), amount);
 

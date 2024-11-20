@@ -5,11 +5,10 @@ pragma solidity 0.8.26;
 import { Test, console2 } from "../../lib/forge-std/src/Test.sol";
 import { Pausable } from "../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
-import { MockSmartM } from "../utils/Mocks.sol";
+import { MockSmartM, MockRegistryAccess } from "../utils/Mocks.sol";
 import { UCTokenHarness } from "../utils/UCTokenHarness.sol";
-import { RegistryAccess } from "../utils/RegistryAccess.sol";
 
-import { UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
+import { DEFAULT_ADMIN_ROLE, UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
 
 import { IUCToken } from "../../src/token/interfaces/IUCToken.sol";
 
@@ -29,15 +28,16 @@ contract UCTokenTests is Test {
     address[] internal _accounts = [_alice, _bob, _charlie, _david];
 
     MockSmartM internal _smartMToken;
+    MockRegistryAccess internal _registryAccess;
+
     UCTokenHarness internal _ucToken;
-    RegistryAccess internal _registryAccess;
 
     function setUp() external {
         _smartMToken = new MockSmartM();
+        _registryAccess = new MockRegistryAccess();
 
-        _registryAccess = new RegistryAccess();
-        _resetInitializerImplementation(address(_registryAccess));
-        _registryAccess.initialize(_admin);
+        // Set default admin role.
+        _registryAccess.grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
         _ucToken = new UCTokenHarness();
         _resetInitializerImplementation(address(_ucToken));
