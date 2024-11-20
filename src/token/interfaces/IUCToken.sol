@@ -7,7 +7,7 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
- * @title  UCT Extension.
+ * @title  Usual SmartM Extension.
  * @author M^0 Labs
  */
 interface IUCToken is IERC20Metadata {
@@ -19,7 +19,7 @@ interface IUCToken is IERC20Metadata {
     /// @notice Emitted when address is removed from blacklist.
     event UnBlacklist(address indexed account);
 
-    /// @notice Emitted when token transfers are attempted by blacklisted account.
+    /// @notice Emitted when token transfers/wraps are attempted by blacklisted account.
     error Blacklisted();
 
     /// @notice Emitted when action is performed by unauthorized account.
@@ -42,7 +42,7 @@ interface IUCToken is IERC20Metadata {
     /**
      * @notice Wraps `amount` SmartM from the caller into UCT for `recipient`.
      * @param  recipient The account receiving the minted UCT.
-     * @param  amount    The amount of M deposited.
+     * @param  amount    The amount of SmartM deposited.
      * @return           The amount of UCT minted.
      */
     function wrap(address recipient, uint256 amount) external returns (uint256);

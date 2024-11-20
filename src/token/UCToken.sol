@@ -21,7 +21,7 @@ import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
 import { DEFAULT_ADMIN_ROLE, UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "./constants.sol";
 
 /**
- * @title  ERC20 Token contract for SmartM UC extension.
+ * @title  ERC20 Token contract for Usual SmartM extension.
  * @author M^0 Labs
  */
 contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
@@ -193,7 +193,7 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
      * @param  smartMToken_ The address of the SmartM token.
      * @param  account      The account from which M is deposited.
      * @param  recipient    The account receiving the minted UCToken.
-     * @param  amount       The amount of M deposited.
+     * @param  amount       The amount of SmartM deposited.
      * @return wrapped      The amount of UCToken minted.
      */
     function _wrap(
@@ -213,10 +213,10 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
     }
 
     /**
-     * @dev    Unwraps `amount` UCToken from `account` into M for `recipient`.
+     * @dev    Unwraps `amount` UCToken from `account` into SmartM for `recipient`.
      * @param  account   The account from which UCToken is burned.
      * @param  recipient The account receiving the withdrawn SmartM.
-     * @param  amount    The amount of  burned.
+     * @param  amount    The amount of UCToken burned.
      * @return unwrapped The amount of SmartM tokens withdrawn.
      */
     function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
@@ -228,10 +228,12 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         ISmartMTokenLike(smartMToken()).transfer(recipient, unwrapped = amount / _DECIMALS_SCALE);
     }
 
-    /// @notice Hook that ensures token transfers are not made from or to not blacklisted addresses.
-    /// @param from The address sending the tokens.
-    /// @param to The address receiving the tokens.
-    /// @param amount The amount of tokens being transferred.
+    /**
+     * @dev    Hook that ensures token transfers are not made from or to blacklisted addresses.
+     * @param  from   The address sending the tokens.
+     * @param  to     The address receiving the tokens.
+     * @param  amount The amount of tokens being transferred.
+     */
     function _update(
         address from,
         address to,

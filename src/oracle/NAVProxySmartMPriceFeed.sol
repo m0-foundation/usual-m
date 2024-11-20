@@ -13,7 +13,7 @@ import { AggregatorV3Interface } from "./AggregatorV3Interface.sol";
  */
 contract NAVProxySmartMPriceFeed is AggregatorV3Interface {
     /// @notice NAV price threshold that defines 1$ Smart M price
-    int256 public constant NAV_POSITIVE_THRESHOLD = 1_100000;
+    int256 public constant NAV_POSITIVE_THRESHOLD = 1e6;
 
     /// @notice The address of the NAV Oracle from which NAV data is fetched.
     address public immutable navOracle;
@@ -75,6 +75,6 @@ contract NAVProxySmartMPriceFeed is AggregatorV3Interface {
      * @return        The Smart M price.
      */
     function _getPriceFromNAV(int256 answer) internal view returns (int256) {
-        return (answer >= NAV_POSITIVE_THRESHOLD) ? int256(10 ** decimals()) : int256(0);
+        return (answer >= NAV_POSITIVE_THRESHOLD) ? int256(10 ** decimals()) : answer;
     }
 }
