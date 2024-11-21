@@ -62,7 +62,7 @@ contract UCTokenTests is Test {
         assertEq(_ucToken.registryAccess(), address(_registryAccess));
         assertEq(_ucToken.name(), "UCToken");
         assertEq(_ucToken.symbol(), "UCT");
-        assertEq(_ucToken.decimals(), 18);
+        assertEq(_ucToken.decimals(), 6);
     }
 
     /* ============ wrap ============ */
@@ -73,7 +73,7 @@ contract UCTokenTests is Test {
         assertEq(_smartMToken.balanceOf(_alice), 0);
         assertEq(_smartMToken.balanceOf(address(_ucToken)), 10e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 10e18);
+        assertEq(_ucToken.balanceOf(_alice), 10e6);
     }
 
     function test_wrap() external {
@@ -83,7 +83,7 @@ contract UCTokenTests is Test {
         assertEq(_smartMToken.balanceOf(_alice), 5e6);
         assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 5e18);
+        assertEq(_ucToken.balanceOf(_alice), 5e6);
     }
 
     function test_wrapWithPermit() external {
@@ -92,7 +92,7 @@ contract UCTokenTests is Test {
 
         assertEq(_smartMToken.balanceOf(_alice), 10e6);
         assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
-        assertEq(_ucToken.balanceOf(_alice), 5e18);
+        assertEq(_ucToken.balanceOf(_alice), 5e6);
 
         assertEq(_ucToken.balanceOf(_bob), 0);
     }
@@ -102,12 +102,12 @@ contract UCTokenTests is Test {
         _ucToken.internalWrap(_alice, _alice, 10e6);
 
         vm.prank(_alice);
-        _ucToken.unwrap(_alice, 5e18);
+        _ucToken.unwrap(_alice, 5e6);
 
         assertEq(_smartMToken.balanceOf(_alice), 5e6);
         assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 5e18);
+        assertEq(_ucToken.balanceOf(_alice), 5e6);
     }
 
     function test_unwrap_wholeBalance() external {
@@ -115,7 +115,7 @@ contract UCTokenTests is Test {
 
         assertEq(_smartMToken.balanceOf(_alice), 0);
         assertEq(_smartMToken.balanceOf(address(_ucToken)), 10e6);
-        assertEq(_ucToken.balanceOf(_alice), 10e18);
+        assertEq(_ucToken.balanceOf(_alice), 10e6);
 
         vm.prank(_alice);
         _ucToken.unwrap(_alice);
@@ -263,7 +263,7 @@ contract UCTokenTests is Test {
 
         vm.prank(_alice);
         uint256 res = _ucToken.wrap(_alice, 10e6);
-        assertEq(res, 10e18);
+        assertEq(res, 10e6);
 
         assertEq(_ucToken.isBlacklisted(_alice), false);
     }

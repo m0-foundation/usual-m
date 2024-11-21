@@ -22,7 +22,7 @@ contract UCTokenIntegrationTests is TestBase {
     function test_integration_constants() external view {
         assertEq(_ucToken.name(), "UCToken");
         assertEq(_ucToken.symbol(), "UCT");
-        assertEq(_ucToken.decimals(), 18);
+        assertEq(_ucToken.decimals(), 6);
         assertEq(_smartMToken.isEarning(address(_ucToken)), true);
         assertEq(_smartMToken.claimOverrideRecipientFor(address(_ucToken)), _treasury);
     }
@@ -37,7 +37,7 @@ contract UCTokenIntegrationTests is TestBase {
         _ucToken.wrap(_alice, amount);
 
         // Check balances of UCToken and Alice after wrapping
-        assertEq(_ucToken.balanceOf(_alice), amount * 1e12);
+        assertEq(_ucToken.balanceOf(_alice), amount);
         assertEq(_smartMToken.balanceOf(address(_ucToken)), amount);
 
         // Fast forward 90 days in the future to generate yield

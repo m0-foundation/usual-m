@@ -14,6 +14,8 @@ import {
 import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { ERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
+import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
 import { ISmartMTokenLike } from "./interfaces/ISmartMTokenLike.sol";
 import { IUCToken } from "./interfaces/IUCToken.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
@@ -28,8 +30,6 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
     using SafeERC20 for ERC20;
 
     /* ============ Structs, Variables, Modifiers ============ */
-
-    uint256 internal constant _DECIMALS_SCALE = 1e12;
 
     /// @custom:storage-location erc7201:UCToken.storage.v0
     struct UCTStorageV0 {
@@ -168,6 +168,11 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
 
     /* ============ External View/Pure Functions ============ */
 
+    /// @inheritdoc IERC20Metadata
+    function decimals() public pure override(ERC20Upgradeable, IERC20Metadata) returns (uint8) {
+        return 6;
+    }
+
     /// @inheritdoc IUCToken
     function smartMToken() public view returns (address) {
         UCTStorageV0 storage $ = _uctStorageV0();
@@ -202,14 +207,10 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         address recipient,
         uint256 amount
     ) internal returns (uint256 wrapped) {
-        // TODO: Consider adding a check for the maximum amount of UCToken that can be minted.
-        // if (amount > type(uint216).max) revert AmountExceedsMaxAllowed();
-
         // NOTE: The behavior of `ISmartMTokenLike.transferFrom` is known, so its return can be ignored.
         ISmartMTokenLike(smartMToken_).transferFrom(account, address(this), amount);
 
-        // NOTE: Scale amount up to account for 18 decimals of UCToken.
-        _mint(recipient, wrapped = amount * _DECIMALS_SCALE);
+        _mint(recipient, wrapped = amount);
     }
 
     /**
@@ -222,10 +223,8 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
     function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
         _burn(account, amount);
 
-        // NOTE: Scale amount down to account for 6 decimals of SmartM.
-        //       Round down in favor of protocol - SmartM yield claimant of this extension.
         // NOTE: The behavior of `ISmartMTokenLike.transfer` is known, so its return can be ignored.
-        ISmartMTokenLike(smartMToken()).transfer(recipient, unwrapped = amount / _DECIMALS_SCALE);
+        ISmartMTokenLike(smartMToken()).transfer(recipient, unwrapped = amount);
     }
 
     /**
