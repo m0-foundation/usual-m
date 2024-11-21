@@ -183,7 +183,7 @@ contract UsualMUnitTests is Test {
         _usualM.pause();
     }
 
-    function test_unpause_unathorized() external {
+    function test_unpause_unauthorized() external {
         vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
@@ -222,12 +222,25 @@ contract UsualMUnitTests is Test {
         _usualM.unwrap(_alice, 10e6);
     }
 
-    function test_blacklisted_transfer() external {
+    function test_blacklisted_transfer_sender() external {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
         vm.prank(_admin);
         _usualM.blacklist(_alice);
+
+        vm.expectRevert(IUsualM.Blacklisted.selector);
+
+        vm.prank(_alice);
+        _usualM.transfer(_bob, 10e6);
+    }
+
+    function test_blacklisted_transfer_receiver() external {
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 10e6);
+
+        vm.prank(_admin);
+        _usualM.blacklist(_bob);
 
         vm.expectRevert(IUsualM.Blacklisted.selector);
 

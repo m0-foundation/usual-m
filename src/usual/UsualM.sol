@@ -196,20 +196,20 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /**
      * @dev    Wraps `amount` M from `account` into UsualM for `recipient`.
-     * @param  smartMToken_ The address of the SmartM token.
-     * @param  account      The account from which M is deposited.
-     * @param  recipient    The account receiving the minted UsualM.
-     * @param  amount       The amount of SmartM deposited.
-     * @return wrapped      The amount of UsualM minted.
+     * @param  smartM    The address of the SmartM token.
+     * @param  account   The account from which M is deposited.
+     * @param  recipient The account receiving the minted UsualM.
+     * @param  amount    The amount of SmartM deposited.
+     * @return wrapped   The amount of UsualM minted.
      */
     function _wrap(
-        address smartMToken_,
+        address smartM,
         address account,
         address recipient,
         uint256 amount
     ) internal returns (uint256 wrapped) {
         // NOTE: The behavior of `ISmartMTokenLike.transferFrom` is known, so its return can be ignored.
-        ISmartMTokenLike(smartMToken_).transferFrom(account, address(this), amount);
+        ISmartMTokenLike(smartM).transferFrom(account, address(this), amount);
 
         _mint(recipient, wrapped = amount);
     }
