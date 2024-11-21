@@ -5,21 +5,21 @@ pragma solidity 0.8.26;
 import { AggregatorV3Interface } from "./AggregatorV3Interface.sol";
 
 /**
- * @title  NAV Proxy UsualM Chainlink Compatible Price Feed
+ * @title  NAV Proxy M Chainlink Compatible Price Feed
  * @notice A proxy contract that retrieves NAV (Net Asset Value) data from an external oracle,
- *         converts it to a Usual M price based on a specified threshold, and is compatible with
+ *         converts it to a M price based on a specified threshold, and is compatible with
  *         the Chainlink AggregatorV3Interface.
  * @author M^0 Labs
  */
-contract NAVProxySmartMPriceFeed is AggregatorV3Interface {
-    /// @notice NAV price threshold that defines 1$ UsualM price
+contract NAVProxyMPriceFeed is AggregatorV3Interface {
+    /// @notice NAV price threshold that defines 1$ M price
     int256 public constant NAV_POSITIVE_THRESHOLD = 1e6;
 
     /// @notice The address of the NAV Oracle from which NAV data is fetched.
     address public immutable navOracle;
 
     /**
-     * @notice Constructs the NAV Proxy UsualM Price Feed contract.
+     * @notice Constructs the NAV Proxy M Price Feed contract.
      * @param  navOracle_ The address of the NAV Oracle.
      */
     constructor(address navOracle_) {
@@ -33,7 +33,7 @@ contract NAVProxySmartMPriceFeed is AggregatorV3Interface {
 
     /// @inheritdoc AggregatorV3Interface
     function description() external pure returns (string memory) {
-        return "M^0 NAV Proxy UsualM Price Feed";
+        return "M^0 NAV Proxy M Price Feed";
     }
 
     /// @inheritdoc AggregatorV3Interface
@@ -53,7 +53,7 @@ contract NAVProxySmartMPriceFeed is AggregatorV3Interface {
             roundId_
         );
 
-        // Convert NAV price to UsualM price given predefined threshold.
+        // Convert NAV price to M price given predefined threshold.
         answer = _getPriceFromNAV(answer);
     }
 
@@ -70,9 +70,9 @@ contract NAVProxySmartMPriceFeed is AggregatorV3Interface {
     }
 
     /**
-     * @dev Converts NAV price to UsualM price based on a predefined sensitivity threshold.
+     * @dev Converts NAV price to M price based on a predefined sensitivity threshold.
      * @param  answer The NAV price to convert.
-     * @return        The UsualM price.
+     * @return        The M price.
      */
     function _getPriceFromNAV(int256 answer) internal pure returns (int256) {
         return (answer >= NAV_POSITIVE_THRESHOLD) ? int256(10 ** decimals()) : answer;
