@@ -2,15 +2,15 @@
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../../lib/forge-std/src/Test.sol";
-import { Pausable } from "../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
+import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
-import { MockSmartM, MockRegistryAccess } from "../utils/Mocks.sol";
-import { UsualMHarness } from "../utils/UsualMHarness.sol";
+import { MockSmartM, MockRegistryAccess } from "../../utils/Mocks.sol";
 
-import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
+import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../../src/usual/constants.sol";
+import { UsualM } from "../../../src/usual/UsualM.sol";
 
-import { IUsualM } from "../../src/token/interfaces/IUsualM.sol";
+import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
 
 contract UsualMUnitTests is Test {
     address internal _treasury = makeAddr("treasury");
@@ -30,7 +30,7 @@ contract UsualMUnitTests is Test {
     MockSmartM internal _smartMToken;
     MockRegistryAccess internal _registryAccess;
 
-    UsualMHarness internal _usualM;
+    UsualM internal _usualM;
 
     function setUp() external {
         _smartMToken = new MockSmartM();
@@ -39,7 +39,7 @@ contract UsualMUnitTests is Test {
         // Set default admin role.
         _registryAccess.grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
-        _usualM = new UsualMHarness();
+        _usualM = new UsualM();
         _resetInitializerImplementation(address(_usualM));
         _usualM.initialize(address(_smartMToken), address(_registryAccess));
 
@@ -99,7 +99,8 @@ contract UsualMUnitTests is Test {
 
     /* ============ unwrap ============ */
     function test_unwrap() external {
-        _usualM.internalWrap(_alice, _alice, 10e6);
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 10e6);
 
         vm.prank(_alice);
         _usualM.unwrap(_alice, 5e6);
@@ -111,7 +112,8 @@ contract UsualMUnitTests is Test {
     }
 
     function test_unwrap_wholeBalance() external {
-        _usualM.internalWrap(_alice, _alice, 10e6);
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 10e6);
 
         assertEq(_smartMToken.balanceOf(_alice), 0);
         assertEq(_smartMToken.balanceOf(address(_usualM)), 10e6);

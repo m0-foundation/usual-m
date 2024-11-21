@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.26;
 
-import { console2 } from "../../lib/forge-std/src/Test.sol";
+import { console2 } from "../../../lib/forge-std/src/Test.sol";
 
 import { TestBase } from "./TestBase.sol";
 

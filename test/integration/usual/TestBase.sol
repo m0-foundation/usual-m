@@ -1,20 +1,20 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: UNLICENSED
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../../lib/forge-std/src/Test.sol";
+import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
 import {
     TransparentUpgradeableProxy
-} from "../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+} from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import { ISmartMTokenLike } from "../../src/token/interfaces/ISmartMTokenLike.sol";
-import { IRegistrarLike } from "../utils/IRegistrarLike.sol";
-import { IUsualM } from "../../src/token/interfaces/IUsualM.sol";
-import { IRegistryAccess } from "../../src/token/interfaces/IRegistryAccess.sol";
+import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
+import { ISmartMTokenLike } from "../../../src/usual/interfaces/ISmartMTokenLike.sol";
+import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
+import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
 
-import { UsualM } from "../../src/token/UsualM.sol";
+import { UsualM } from "../../../src/usual/UsualM.sol";
 
-import { USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
+import { USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
