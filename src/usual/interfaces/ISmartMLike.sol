@@ -6,7 +6,7 @@ pragma solidity 0.8.26;
  * @title  Subset of Smart M Token interface required for source contracts.
  * @author M^0 Labs
  */
-interface ISmartMTokenLike {
+interface ISmartMLike {
     /* ============ Interactive Functions ============ */
 
     /**

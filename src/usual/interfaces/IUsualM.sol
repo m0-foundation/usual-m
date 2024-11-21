@@ -32,7 +32,7 @@ interface IUsualM is IERC20Metadata {
     error ZeroAddress();
 
     /// @notice Emitted if SmartM Token is 0x0.
-    error ZeroSmartMToken();
+    error ZeroSmartM();
 
     /// @notice Emitted if Registry Access is 0x0.
     error ZeroRegistryAccess();
@@ -116,7 +116,7 @@ interface IUsualM is IERC20Metadata {
     function isBlacklisted(address account) external view returns (bool);
 
     /// @notice Returns the SmartM Token address.
-    function smartMToken() external view returns (address);
+    function smartM() external view returns (address);
 
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);

@@ -58,7 +58,7 @@ contract UsualMUnitTests is Test {
 
     /* ============ initialization ============ */
     function test_init() external view {
-        assertEq(_usualM.smartMToken(), address(_smartMToken));
+        assertEq(_usualM.smartM(), address(_smartMToken));
         assertEq(_usualM.registryAccess(), address(_registryAccess));
         assertEq(_usualM.name(), "UsualM");
         assertEq(_usualM.symbol(), "USUALM");

@@ -16,14 +16,14 @@ import { ERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/ER
 
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { ISmartMTokenLike } from "./interfaces/ISmartMTokenLike.sol";
+import { ISmartMLike } from "./interfaces/ISmartMLike.sol";
 import { IUsualM } from "./interfaces/IUsualM.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
 
 import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "./constants.sol";
 
 /**
- * @title  ERC20 Token contract for Usual SmartM extension.
+ * @title  Usual Smart M Extension.
  * @author M^0 Labs
  */
 contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
@@ -33,7 +33,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /// @custom:storage-location erc7201:UsualM.storage.v0
     struct UsualMStorageV0 {
-        address smartMToken;
+        address smartM;
         address registryAccess;
         mapping(address => bool) isBlacklisted;
     }
@@ -69,8 +69,8 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /* ============ Initializer ============ */
 
-    function initialize(address smartMToken_, address registryAccess_) public initializer {
-        if (smartMToken_ == address(0)) revert ZeroSmartMToken();
+    function initialize(address smartM_, address registryAccess_) public initializer {
+        if (smartM_ == address(0)) revert ZeroSmartM();
         if (registryAccess_ == address(0)) revert ZeroRegistryAccess();
 
         __ERC20_init("UsualM", "USUALM");
@@ -78,7 +78,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         __ERC20Permit_init("UsualM");
 
         UsualMStorageV0 storage $ = _usualMStorageV0();
-        $.smartMToken = smartMToken_;
+        $.smartM = smartM_;
         $.registryAccess = registryAccess_;
     }
 
@@ -86,13 +86,13 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /// @inheritdoc IUsualM
     function wrap(address recipient, uint256 amount) external returns (uint256) {
-        return _wrap(smartMToken(), msg.sender, recipient, amount);
+        return _wrap(smartM(), msg.sender, recipient, amount);
     }
 
     /// @inheritdoc IUsualM
     function wrap(address recipient) external returns (uint256) {
-        address smartMToken_ = smartMToken();
-        return _wrap(smartMToken_, msg.sender, recipient, ISmartMTokenLike(smartMToken_).balanceOf(msg.sender));
+        address smartM_ = smartM();
+        return _wrap(smartM_, msg.sender, recipient, ISmartMLike(smartM_).balanceOf(msg.sender));
     }
 
     /// @inheritdoc IUsualM
@@ -104,11 +104,11 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         bytes32 r,
         bytes32 s
     ) external returns (uint256) {
-        address smartMToken_ = smartMToken();
+        address smartM_ = smartM();
 
-        ISmartMTokenLike(smartMToken_).permit(msg.sender, address(this), amount, deadline, v, r, s);
+        ISmartMLike(smartM_).permit(msg.sender, address(this), amount, deadline, v, r, s);
 
-        return _wrap(smartMToken_, msg.sender, recipient, amount);
+        return _wrap(smartM_, msg.sender, recipient, amount);
     }
 
     /// @inheritdoc IUsualM
@@ -175,9 +175,9 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     }
 
     /// @inheritdoc IUsualM
-    function smartMToken() public view returns (address) {
+    function smartM() public view returns (address) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
-        return $.smartMToken;
+        return $.smartM;
     }
 
     /// @inheritdoc IUsualM
@@ -196,20 +196,20 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /**
      * @dev    Wraps `amount` M from `account` into UsualM for `recipient`.
-     * @param  smartM    The address of the SmartM token.
-     * @param  account   The account from which M is deposited.
-     * @param  recipient The account receiving the minted UsualM.
-     * @param  amount    The amount of SmartM deposited.
-     * @return wrapped   The amount of UsualM minted.
+     * @param  smartM_    The address of the SmartM token.
+     * @param  account    The account from which M is deposited.
+     * @param  recipient  The account receiving the minted UsualM.
+     * @param  amount     The amount of SmartM deposited.
+     * @return wrapped    The amount of UsualM minted.
      */
     function _wrap(
-        address smartM,
+        address smartM_,
         address account,
         address recipient,
         uint256 amount
     ) internal returns (uint256 wrapped) {
-        // NOTE: The behavior of `ISmartMTokenLike.transferFrom` is known, so its return can be ignored.
-        ISmartMTokenLike(smartM).transferFrom(account, address(this), amount);
+        // NOTE: The behavior of `ISmartMLike.transferFrom` is known, so its return can be ignored.
+        ISmartMLike(smartM_).transferFrom(account, address(this), amount);
 
         _mint(recipient, wrapped = amount);
     }
@@ -224,8 +224,8 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
         _burn(account, amount);
 
-        // NOTE: The behavior of `ISmartMTokenLike.transfer` is known, so its return can be ignored.
-        ISmartMTokenLike(smartMToken()).transfer(recipient, unwrapped = amount);
+        // NOTE: The behavior of `ISmartMLike.transfer` is known, so its return can be ignored.
+        ISmartMLike(smartM()).transfer(recipient, unwrapped = amount);
     }
 
     /**

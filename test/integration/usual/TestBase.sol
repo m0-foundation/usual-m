@@ -8,7 +8,7 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
-import { ISmartMTokenLike } from "../../../src/usual/interfaces/ISmartMTokenLike.sol";
+import { ISmartMLike } from "../../../src/usual/interfaces/ISmartMLike.sol";
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
 import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
 
@@ -23,7 +23,7 @@ contract TestBase is Test {
     bytes32 internal constant _EARNERS_LIST = "earners";
     bytes32 internal constant _CLAIM_OVERRIDE_RECIPIENT_PREFIX = "wm_claim_override_recipient";
 
-    ISmartMTokenLike internal constant _smartMToken = ISmartMTokenLike(0x437cc33344a0B27A429f795ff6B469C72698B291);
+    ISmartMLike internal constant _smartMToken = ISmartMLike(0x437cc33344a0B27A429f795ff6B469C72698B291);
 
     // Large SmartM holder on Ethereum Mainnet
     address internal constant _smartMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
