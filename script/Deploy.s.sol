@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 
 import { Script, console2 } from "../lib/forge-std/src/Script.sol";
 
-import { UCToken } from "../src/token/UCToken.sol";
+import { UsualM } from "../src/token/UsualM.sol";
 
 import {
     TransparentUpgradeableProxy
@@ -24,17 +24,17 @@ contract DeployScript is Script {
 
         vm.startBroadcast(deployer_);
 
-        address ucTokenImplementation = address(new UCToken());
-        bytes memory ucTokenData = abi.encodeWithSignature(
+        address usualMImplementation = address(new UsualM());
+        bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
             address(_SMART_M_TOKEN),
             _USUAL_REGISTRY_ACCESS
         );
-        address ucToken = address(new TransparentUpgradeableProxy(ucTokenImplementation, _USUAL_ADMIN, ucTokenData));
+        address usualM = address(new TransparentUpgradeableProxy(usualMImplementation, _USUAL_ADMIN, usualMData));
 
         vm.stopBroadcast();
 
-        console2.log("UCToken implementation:", ucTokenImplementation);
-        console2.log("UCToken:", ucToken);
+        console2.log("UsualM implementation:", usualMImplementation);
+        console2.log("UsualM:", usualM);
     }
 }

@@ -17,35 +17,36 @@ import { ERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/ER
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 import { ISmartMTokenLike } from "./interfaces/ISmartMTokenLike.sol";
-import { IUCToken } from "./interfaces/IUCToken.sol";
+import { IUsualM } from "./interfaces/IUsualM.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
 
-import { DEFAULT_ADMIN_ROLE, UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "./constants.sol";
+import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "./constants.sol";
 
 /**
  * @title  ERC20 Token contract for Usual SmartM extension.
  * @author M^0 Labs
  */
-contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
+contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     using SafeERC20 for ERC20;
 
     /* ============ Structs, Variables, Modifiers ============ */
 
-    /// @custom:storage-location erc7201:UCToken.storage.v0
-    struct UCTStorageV0 {
+    /// @custom:storage-location erc7201:UsualM.storage.v0
+    struct UsualMStorageV0 {
         address smartMToken;
         address registryAccess;
         mapping(address => bool) isBlacklisted;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("UCToken.storage.v0")) - 1)) & ~bytes32(uint256(0xff))
+    // keccak256(abi.encode(uint256(keccak256("UsualM.storage.v0")) - 1)) & ~bytes32(uint256(0xff))
     // solhint-disable-next-line
-    bytes32 public constant UCTStorageV0Location = 0x0ccee811a51b7a9ad96750cc270a934f534adda6dde5843cc4def33bcc12a300;
+    bytes32 public constant UsualMStorageV0Location =
+        0xaf0b0773f61ce9af1982ff9a13506e1d8ad90f04391405f722e2ad38e8ffd300;
 
     /// @notice Returns the storage struct of the contract.
     /// @return $ .
-    function _uctStorageV0() internal pure returns (UCTStorageV0 storage $) {
-        bytes32 position = UCTStorageV0Location;
+    function _usualMStorageV0() internal pure returns (UsualMStorageV0 storage $) {
+        bytes32 position = UsualMStorageV0Location;
         // solhint-disable-next-line no-inline-assembly
         assembly {
             $.slot := position
@@ -53,7 +54,7 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
     }
 
     modifier onlyMatchingRole(bytes32 role) {
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         if (!IRegistryAccess($.registryAccess).hasRole(role, msg.sender)) revert NotAuthorized();
 
         _;
@@ -72,29 +73,29 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         if (smartMToken_ == address(0)) revert ZeroSmartMToken();
         if (registryAccess_ == address(0)) revert ZeroRegistryAccess();
 
-        __ERC20_init("UCToken", "UCT");
+        __ERC20_init("UsualM", "USUALM");
         __ERC20Pausable_init();
-        __ERC20Permit_init("UCToken");
+        __ERC20Permit_init("UsualM");
 
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         $.smartMToken = smartMToken_;
         $.registryAccess = registryAccess_;
     }
 
     /* ============ Interactive Functions ============ */
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     function wrap(address recipient, uint256 amount) external returns (uint256) {
         return _wrap(smartMToken(), msg.sender, recipient, amount);
     }
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     function wrap(address recipient) external returns (uint256) {
         address smartMToken_ = smartMToken();
         return _wrap(smartMToken_, msg.sender, recipient, ISmartMTokenLike(smartMToken_).balanceOf(msg.sender));
     }
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     function wrapWithPermit(
         address recipient,
         uint256 amount,
@@ -110,38 +111,38 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         return _wrap(smartMToken_, msg.sender, recipient, amount);
     }
 
-    /// @inheritdoc IUCToken
-    function unwrap(address recipient, uint256 amount) external onlyMatchingRole(UCT_UNWRAP) returns (uint256) {
+    /// @inheritdoc IUsualM
+    function unwrap(address recipient, uint256 amount) external onlyMatchingRole(USUAL_M_UNWRAP) returns (uint256) {
         return _unwrap(msg.sender, recipient, amount);
     }
 
-    /// @inheritdoc IUCToken
-    function unwrap(address recipient) external onlyMatchingRole(UCT_UNWRAP) returns (uint256) {
+    /// @inheritdoc IUsualM
+    function unwrap(address recipient) external onlyMatchingRole(USUAL_M_UNWRAP) returns (uint256) {
         return _unwrap(msg.sender, recipient, balanceOf(msg.sender));
     }
 
     /* ============ Special Admin Functions ============ */
 
-    /// @inheritdoc IUCToken
-    function pause() external onlyMatchingRole(UCT_PAUSE_UNPAUSE) {
+    /// @inheritdoc IUsualM
+    function pause() external onlyMatchingRole(USUAL_M_PAUSE_UNPAUSE) {
         _pause();
     }
 
-    /// @inheritdoc IUCToken
-    function unpause() external onlyMatchingRole(UCT_PAUSE_UNPAUSE) {
+    /// @inheritdoc IUsualM
+    function unpause() external onlyMatchingRole(USUAL_M_PAUSE_UNPAUSE) {
         _unpause();
     }
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     /// @dev Can only be called by an account with the `DEFAULT_ADMIN_ROLE` role.
     function blacklist(address account) external {
         if (account == address(0)) revert ZeroAddress();
 
         // NOTE: Avoid reading storage twice while using `onlyMatchingRole` modifier.
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         if (!IRegistryAccess($.registryAccess).hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert NotAuthorized();
 
-        // Revert in the same way as USD0 if the account is already blacklisted.
+        // Revert in the same way as USD0 if `account` is already blacklisted.
         if ($.isBlacklisted[account]) revert SameValue();
 
         $.isBlacklisted[account] = true;
@@ -149,16 +150,16 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         emit Blacklist(account);
     }
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     /// @dev Can only be called by an account with the `DEFAULT_ADMIN_ROLE` role.
     function unBlacklist(address account) external {
         if (account == address(0)) revert ZeroAddress();
 
         // NOTE: Avoid reading storage twice while using `onlyMatchingRole` modifier.
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         if (!IRegistryAccess($.registryAccess).hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert NotAuthorized();
 
-        // Revert in the same way as USD0 if the account is not blacklisted.
+        // Revert in the same way as USD0 if `account` is not blacklisted.
         if (!$.isBlacklisted[account]) revert SameValue();
 
         $.isBlacklisted[account] = false;
@@ -173,33 +174,33 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         return 6;
     }
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     function smartMToken() public view returns (address) {
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         return $.smartMToken;
     }
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     function registryAccess() public view returns (address) {
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         return $.registryAccess;
     }
 
-    /// @inheritdoc IUCToken
+    /// @inheritdoc IUsualM
     function isBlacklisted(address account) external view returns (bool) {
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         return $.isBlacklisted[account];
     }
 
     /* ============ Internal Interactive Functions ============ */
 
     /**
-     * @dev    Wraps `amount` M from `account` into UCToken for `recipient`.
+     * @dev    Wraps `amount` M from `account` into UsualM for `recipient`.
      * @param  smartMToken_ The address of the SmartM token.
      * @param  account      The account from which M is deposited.
-     * @param  recipient    The account receiving the minted UCToken.
+     * @param  recipient    The account receiving the minted UsualM.
      * @param  amount       The amount of SmartM deposited.
-     * @return wrapped      The amount of UCToken minted.
+     * @return wrapped      The amount of UsualM minted.
      */
     function _wrap(
         address smartMToken_,
@@ -214,10 +215,10 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
     }
 
     /**
-     * @dev    Unwraps `amount` UCToken from `account` into SmartM for `recipient`.
-     * @param  account   The account from which UCToken is burned.
+     * @dev    Unwraps `amount` UsualM from `account` into SmartM for `recipient`.
+     * @param  account   The account from which UsualM is burned.
      * @param  recipient The account receiving the withdrawn SmartM.
-     * @param  amount    The amount of UCToken burned.
+     * @param  amount    The amount of UsualM burned.
      * @return unwrapped The amount of SmartM tokens withdrawn.
      */
     function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
@@ -238,7 +239,7 @@ contract UCToken is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUCToken {
         address to,
         uint256 amount
     ) internal virtual override(ERC20PausableUpgradeable, ERC20Upgradeable) {
-        UCTStorageV0 storage $ = _uctStorageV0();
+        UsualMStorageV0 storage $ = _usualMStorageV0();
         if ($.isBlacklisted[from] || $.isBlacklisted[to]) revert Blacklisted();
 
         super._update(from, to, amount);

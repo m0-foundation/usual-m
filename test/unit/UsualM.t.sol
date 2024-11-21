@@ -6,13 +6,13 @@ import { Test, console2 } from "../../lib/forge-std/src/Test.sol";
 import { Pausable } from "../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
 import { MockSmartM, MockRegistryAccess } from "../utils/Mocks.sol";
-import { UCTokenHarness } from "../utils/UCTokenHarness.sol";
+import { UsualMHarness } from "../utils/UsualMHarness.sol";
 
-import { DEFAULT_ADMIN_ROLE, UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
+import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
 
-import { IUCToken } from "../../src/token/interfaces/IUCToken.sol";
+import { IUsualM } from "../../src/token/interfaces/IUsualM.sol";
 
-contract UCTokenTests is Test {
+contract UsualMUnitTests is Test {
     address internal _treasury = makeAddr("treasury");
 
     address internal _admin = makeAddr("admin");
@@ -30,7 +30,7 @@ contract UCTokenTests is Test {
     MockSmartM internal _smartMToken;
     MockRegistryAccess internal _registryAccess;
 
-    UCTokenHarness internal _ucToken;
+    UsualMHarness internal _usualM;
 
     function setUp() external {
         _smartMToken = new MockSmartM();
@@ -39,264 +39,264 @@ contract UCTokenTests is Test {
         // Set default admin role.
         _registryAccess.grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
-        _ucToken = new UCTokenHarness();
-        _resetInitializerImplementation(address(_ucToken));
-        _ucToken.initialize(address(_smartMToken), address(_registryAccess));
+        _usualM = new UsualMHarness();
+        _resetInitializerImplementation(address(_usualM));
+        _usualM.initialize(address(_smartMToken), address(_registryAccess));
 
         // Set pauser/unpauser role.
         vm.prank(_admin);
-        _registryAccess.grantRole(UCT_PAUSE_UNPAUSE, _pauser);
+        _registryAccess.grantRole(USUAL_M_PAUSE_UNPAUSE, _pauser);
 
         // Fund accounts with SmartM tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
             _smartMToken.setBalanceOf(_accounts[i], 10e6);
 
             vm.prank(_admin);
-            _registryAccess.grantRole(UCT_UNWRAP, _accounts[i]);
+            _registryAccess.grantRole(USUAL_M_UNWRAP, _accounts[i]);
         }
     }
 
     /* ============ initialization ============ */
     function test_init() external view {
-        assertEq(_ucToken.smartMToken(), address(_smartMToken));
-        assertEq(_ucToken.registryAccess(), address(_registryAccess));
-        assertEq(_ucToken.name(), "UCToken");
-        assertEq(_ucToken.symbol(), "UCT");
-        assertEq(_ucToken.decimals(), 6);
+        assertEq(_usualM.smartMToken(), address(_smartMToken));
+        assertEq(_usualM.registryAccess(), address(_registryAccess));
+        assertEq(_usualM.name(), "UsualM");
+        assertEq(_usualM.symbol(), "USUALM");
+        assertEq(_usualM.decimals(), 6);
     }
 
     /* ============ wrap ============ */
     function test_wrap_wholeBalance() external {
         vm.prank(_alice);
-        _ucToken.wrap(_alice);
+        _usualM.wrap(_alice);
 
         assertEq(_smartMToken.balanceOf(_alice), 0);
-        assertEq(_smartMToken.balanceOf(address(_ucToken)), 10e6);
+        assertEq(_smartMToken.balanceOf(address(_usualM)), 10e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 10e6);
+        assertEq(_usualM.balanceOf(_alice), 10e6);
     }
 
     function test_wrap() external {
         vm.prank(_alice);
-        _ucToken.wrap(_alice, 5e6);
+        _usualM.wrap(_alice, 5e6);
 
         assertEq(_smartMToken.balanceOf(_alice), 5e6);
-        assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
+        assertEq(_smartMToken.balanceOf(address(_usualM)), 5e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 5e6);
+        assertEq(_usualM.balanceOf(_alice), 5e6);
     }
 
     function test_wrapWithPermit() external {
         vm.prank(_bob);
-        _ucToken.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0));
+        _usualM.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0));
 
         assertEq(_smartMToken.balanceOf(_alice), 10e6);
-        assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
-        assertEq(_ucToken.balanceOf(_alice), 5e6);
+        assertEq(_smartMToken.balanceOf(address(_usualM)), 5e6);
+        assertEq(_usualM.balanceOf(_alice), 5e6);
 
-        assertEq(_ucToken.balanceOf(_bob), 0);
+        assertEq(_usualM.balanceOf(_bob), 0);
     }
 
     /* ============ unwrap ============ */
     function test_unwrap() external {
-        _ucToken.internalWrap(_alice, _alice, 10e6);
+        _usualM.internalWrap(_alice, _alice, 10e6);
 
         vm.prank(_alice);
-        _ucToken.unwrap(_alice, 5e6);
+        _usualM.unwrap(_alice, 5e6);
 
         assertEq(_smartMToken.balanceOf(_alice), 5e6);
-        assertEq(_smartMToken.balanceOf(address(_ucToken)), 5e6);
+        assertEq(_smartMToken.balanceOf(address(_usualM)), 5e6);
 
-        assertEq(_ucToken.balanceOf(_alice), 5e6);
+        assertEq(_usualM.balanceOf(_alice), 5e6);
     }
 
     function test_unwrap_wholeBalance() external {
-        _ucToken.internalWrap(_alice, _alice, 10e6);
+        _usualM.internalWrap(_alice, _alice, 10e6);
 
         assertEq(_smartMToken.balanceOf(_alice), 0);
-        assertEq(_smartMToken.balanceOf(address(_ucToken)), 10e6);
-        assertEq(_ucToken.balanceOf(_alice), 10e6);
+        assertEq(_smartMToken.balanceOf(address(_usualM)), 10e6);
+        assertEq(_usualM.balanceOf(_alice), 10e6);
 
         vm.prank(_alice);
-        _ucToken.unwrap(_alice);
+        _usualM.unwrap(_alice);
 
         assertEq(_smartMToken.balanceOf(_alice), 10e6);
-        assertEq(_smartMToken.balanceOf(address(_ucToken)), 0);
+        assertEq(_smartMToken.balanceOf(address(_usualM)), 0);
 
-        assertEq(_ucToken.balanceOf(_alice), 0);
+        assertEq(_usualM.balanceOf(_alice), 0);
     }
 
     function test_unwarp_notAllowed() external {
-        vm.expectRevert(IUCToken.NotAuthorized.selector);
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
-        _ucToken.unwrap(_other, 5e6);
+        _usualM.unwrap(_other, 5e6);
     }
 
     function test_unwarp_wholeBalance_notAllowed() external {
-        vm.expectRevert(IUCToken.NotAuthorized.selector);
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
-        _ucToken.unwrap(_other);
+        _usualM.unwrap(_other);
     }
 
     /* ============ pause ============ */
     function test_pause_wrap() external {
         vm.prank(_pauser);
-        _ucToken.pause();
+        _usualM.pause();
 
         vm.expectRevert(Pausable.EnforcedPause.selector);
 
         vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        _usualM.wrap(_alice, 10e6);
     }
 
     function test_pause_transfer() external {
         vm.prank(_pauser);
-        _ucToken.pause();
+        _usualM.pause();
 
         vm.expectRevert(Pausable.EnforcedPause.selector);
 
         vm.prank(_alice);
-        _ucToken.transfer(_bob, 5e6);
+        _usualM.transfer(_bob, 5e6);
     }
 
     function test_pause_unwrap() external {
         vm.prank(_alice);
-        _ucToken.wrap(_alice);
+        _usualM.wrap(_alice);
 
         vm.prank(_pauser);
-        _ucToken.pause();
+        _usualM.pause();
 
         vm.expectRevert(Pausable.EnforcedPause.selector);
 
         vm.prank(_alice);
-        _ucToken.unwrap(_bob);
+        _usualM.unwrap(_bob);
     }
 
     function test_pause_unauthorized() external {
-        vm.expectRevert(IUCToken.NotAuthorized.selector);
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
-        _ucToken.pause();
+        _usualM.pause();
     }
 
     function test_unpause_unathorized() external {
-        vm.expectRevert(IUCToken.NotAuthorized.selector);
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
-        _ucToken.unpause();
+        _usualM.unpause();
     }
 
     /* ============ blacklist ============ */
     function test_blacklisted_wrap() external {
-        assertEq(_ucToken.isBlacklisted(_alice), false);
+        assertEq(_usualM.isBlacklisted(_alice), false);
 
         vm.prank(_admin);
-        _ucToken.blacklist(_alice);
+        _usualM.blacklist(_alice);
 
-        assertEq(_ucToken.isBlacklisted(_alice), true);
+        assertEq(_usualM.isBlacklisted(_alice), true);
 
-        vm.expectRevert(IUCToken.Blacklisted.selector);
+        vm.expectRevert(IUsualM.Blacklisted.selector);
 
         vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        _usualM.wrap(_alice, 10e6);
     }
 
     function test_blacklisted_unwrap() external {
-        assertEq(_ucToken.isBlacklisted(_alice), false);
+        assertEq(_usualM.isBlacklisted(_alice), false);
 
         vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        _usualM.wrap(_alice, 10e6);
 
         vm.prank(_admin);
-        _ucToken.blacklist(_alice);
+        _usualM.blacklist(_alice);
 
-        assertEq(_ucToken.isBlacklisted(_alice), true);
+        assertEq(_usualM.isBlacklisted(_alice), true);
 
-        vm.expectRevert(IUCToken.Blacklisted.selector);
+        vm.expectRevert(IUsualM.Blacklisted.selector);
 
         vm.prank(_alice);
-        _ucToken.unwrap(_alice, 10e6);
+        _usualM.unwrap(_alice, 10e6);
     }
 
     function test_blacklisted_transfer() external {
         vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        _usualM.wrap(_alice, 10e6);
 
         vm.prank(_admin);
-        _ucToken.blacklist(_alice);
+        _usualM.blacklist(_alice);
 
-        vm.expectRevert(IUCToken.Blacklisted.selector);
+        vm.expectRevert(IUsualM.Blacklisted.selector);
 
         vm.prank(_alice);
-        _ucToken.transfer(_bob, 10e6);
+        _usualM.transfer(_bob, 10e6);
     }
 
     function test_blacklist_unauthorized() external {
-        vm.expectRevert(IUCToken.NotAuthorized.selector);
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
-        _ucToken.blacklist(_alice);
+        _usualM.blacklist(_alice);
     }
 
     function test_unBlacklist_unauthorized() external {
-        vm.expectRevert(IUCToken.NotAuthorized.selector);
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
-        _ucToken.unBlacklist(_alice);
+        _usualM.unBlacklist(_alice);
     }
 
     function test_blacklist_unBlacklist() external {
         vm.prank(_admin);
-        _ucToken.blacklist(_alice);
+        _usualM.blacklist(_alice);
 
-        assertEq(_ucToken.isBlacklisted(_alice), true);
+        assertEq(_usualM.isBlacklisted(_alice), true);
 
-        vm.expectRevert(IUCToken.Blacklisted.selector);
+        vm.expectRevert(IUsualM.Blacklisted.selector);
 
         vm.prank(_alice);
-        _ucToken.wrap(_alice, 10e6);
+        _usualM.wrap(_alice, 10e6);
 
         vm.prank(_admin);
-        _ucToken.unBlacklist(_alice);
+        _usualM.unBlacklist(_alice);
 
         vm.prank(_alice);
-        uint256 res = _ucToken.wrap(_alice, 10e6);
+        uint256 res = _usualM.wrap(_alice, 10e6);
         assertEq(res, 10e6);
 
-        assertEq(_ucToken.isBlacklisted(_alice), false);
+        assertEq(_usualM.isBlacklisted(_alice), false);
     }
 
     function test_blacklist_zeroAddress() external {
-        vm.expectRevert(IUCToken.ZeroAddress.selector);
+        vm.expectRevert(IUsualM.ZeroAddress.selector);
 
         vm.prank(_admin);
-        _ucToken.blacklist(address(0));
+        _usualM.blacklist(address(0));
     }
 
     function test_unBlacklist_zeroAddress() external {
-        vm.expectRevert(IUCToken.ZeroAddress.selector);
+        vm.expectRevert(IUsualM.ZeroAddress.selector);
 
         vm.prank(_admin);
-        _ucToken.unBlacklist(address(0));
+        _usualM.unBlacklist(address(0));
     }
 
     function test_blacklist_sameValue() external {
         vm.prank(_admin);
-        _ucToken.blacklist(_alice);
+        _usualM.blacklist(_alice);
 
-        vm.expectRevert(IUCToken.SameValue.selector);
+        vm.expectRevert(IUsualM.SameValue.selector);
 
         vm.prank(_admin);
-        _ucToken.blacklist(_alice);
+        _usualM.blacklist(_alice);
     }
 
     function test_unBlacklist_sameValue() external {
-        vm.expectRevert(IUCToken.SameValue.selector);
+        vm.expectRevert(IUsualM.SameValue.selector);
 
         vm.prank(_admin);
-        _ucToken.unBlacklist(_alice);
+        _usualM.unBlacklist(_alice);
     }
 
     /* ============ utils ============ */

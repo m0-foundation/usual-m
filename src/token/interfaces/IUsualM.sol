@@ -10,7 +10,7 @@ import {
  * @title  Usual SmartM Extension.
  * @author M^0 Labs
  */
-interface IUCToken is IERC20Metadata {
+interface IUsualM is IERC20Metadata {
     /* ============ Events ============ */
 
     /// @notice Emitted when address is added to blacklist.
@@ -40,29 +40,29 @@ interface IUCToken is IERC20Metadata {
     /* ============ Interactive Functions ============ */
 
     /**
-     * @notice Wraps `amount` SmartM from the caller into UCT for `recipient`.
-     * @param  recipient The account receiving the minted UCT.
+     * @notice Wraps `amount` SmartM from the caller into UsualM for `recipient`.
+     * @param  recipient The account receiving the minted UsualM.
      * @param  amount    The amount of SmartM deposited.
-     * @return           The amount of UCT minted.
+     * @return           The amount of UsualM minted.
      */
     function wrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Wraps all the SmartM from the caller into UCT for `recipient`.
-     * @param  recipient The account receiving the minted UCT.
-     * @return           The amount of UCT minted.
+     * @notice Wraps all the SmartM from the caller into UsualM for `recipient`.
+     * @param  recipient The account receiving the minted UsualM.
+     * @return           The amount of UsualM minted.
      */
     function wrap(address recipient) external returns (uint256);
 
     /**
-     * @notice Wraps `amount` SmartM from the caller into UCT for `recipient`, using a permit.
-     * @param  recipient The account receiving the minted UCT.
+     * @notice Wraps `amount` SmartM from the caller into UsualM for `recipient`, using a permit.
+     * @param  recipient The account receiving the minted UsualM.
      * @param  amount    The amount of SmartM deposited.
      * @param  deadline  The last timestamp where the signature is still valid.
      * @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  s         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-     * @return           The amount of UCT minted.
+     * @return           The amount of UsualM minted.
      */
     function wrapWithPermit(
         address recipient,
@@ -74,15 +74,15 @@ interface IUCToken is IERC20Metadata {
     ) external returns (uint256);
 
     /**
-     * @notice Unwraps `amount` UCT from the caller into SmartM for `recipient`.
+     * @notice Unwraps `amount` UsualM from the caller into SmartM for `recipient`.
      * @param  recipient The account receiving the withdrawn SmartM.
-     * @param  amount    The amount of UCT burned.
+     * @param  amount    The amount of UsualM burned.
      * @return           The amount of SmartM withdrawn.
      */
     function unwrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Unwraps all the UCT from the caller into SmartM for `recipient`.
+     * @notice Unwraps all the UsualM from the caller into SmartM for `recipient`.
      * @param  recipient The account receiving the withdrawn SmartM.
      * @return           The amount of SmartM withdrawn.
      */

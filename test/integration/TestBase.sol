@@ -9,12 +9,12 @@ import {
 
 import { ISmartMTokenLike } from "../../src/token/interfaces/ISmartMTokenLike.sol";
 import { IRegistrarLike } from "../utils/IRegistrarLike.sol";
-import { IUCToken } from "../../src/token/interfaces/IUCToken.sol";
+import { IUsualM } from "../../src/token/interfaces/IUsualM.sol";
 import { IRegistryAccess } from "../../src/token/interfaces/IRegistryAccess.sol";
 
-import { UCToken } from "../../src/token/UCToken.sol";
+import { UsualM } from "../../src/token/UsualM.sol";
 
-import { UCT_UNWRAP, UCT_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
+import { USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../src/token/constants.sol";
 
 contract TestBase is Test {
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
@@ -48,8 +48,8 @@ contract TestBase is Test {
 
     address[] internal _accounts = [_alice, _bob, _carol, _dave, _eric, _frank, _grace, _henry, _ivan, _judy];
 
-    address internal _ucTokenImplementation;
-    IUCToken internal _ucToken;
+    address internal _usualMImplementation;
+    IUsualM internal _usualM;
 
     function _addToList(bytes32 list_, address account_) internal {
         vm.prank(_standardGovernor);
@@ -72,18 +72,18 @@ contract TestBase is Test {
 
     function _wrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _smartMToken.approve(address(_ucToken), amount_);
+        _smartMToken.approve(address(_usualM), amount_);
 
         vm.prank(account_);
-        _ucToken.wrap(recipient_, amount_);
+        _usualM.wrap(recipient_, amount_);
     }
 
     function _wrap(address account_, address recipient_) internal {
         vm.prank(account_);
-        _smartMToken.approve(address(_ucToken), type(uint256).max);
+        _smartMToken.approve(address(_usualM), type(uint256).max);
 
         vm.prank(account_);
-        _ucToken.wrap(recipient_);
+        _usualM.wrap(recipient_);
     }
 
     function _wrapWithPermitVRS(
@@ -97,17 +97,17 @@ contract TestBase is Test {
         (uint8 v_, bytes32 r_, bytes32 s_) = _getPermit(account_, signerPrivateKey_, amount_, nonce_, deadline_);
 
         vm.prank(account_);
-        _ucToken.wrapWithPermit(recipient_, amount_, deadline_, v_, r_, s_);
+        _usualM.wrapWithPermit(recipient_, amount_, deadline_, v_, r_, s_);
     }
 
     function _unwrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _ucToken.unwrap(recipient_, amount_);
+        _usualM.unwrap(recipient_, amount_);
     }
 
     function _unwrap(address account_, address recipient_) internal {
         vm.prank(account_);
-        _ucToken.unwrap(recipient_);
+        _usualM.unwrap(recipient_);
     }
 
     function _set(bytes32 key_, bytes32 value_) internal {
@@ -120,13 +120,13 @@ contract TestBase is Test {
     }
 
     function _deployComponents() internal {
-        _ucTokenImplementation = address(new UCToken());
-        bytes memory ucTokenData = abi.encodeWithSignature(
+        _usualMImplementation = address(new UsualM());
+        bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
             address(_smartMToken),
             _registryAccess
         );
-        _ucToken = IUCToken(address(new TransparentUpgradeableProxy(_ucTokenImplementation, _admin, ucTokenData)));
+        _usualM = IUsualM(address(new TransparentUpgradeableProxy(_usualMImplementation, _admin, usualMData)));
     }
 
     function _fundAccounts() internal {
@@ -138,11 +138,11 @@ contract TestBase is Test {
 
     function _grantRoles() internal {
         vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(UCT_PAUSE_UNPAUSE, _admin);
+        IRegistryAccess(_registryAccess).grantRole(USUAL_M_PAUSE_UNPAUSE, _admin);
 
         for (uint256 i = 0; i < _accounts.length; ++i) {
             vm.prank(_admin);
-            IRegistryAccess(_registryAccess).grantRole(UCT_UNWRAP, _accounts[i]);
+            IRegistryAccess(_registryAccess).grantRole(USUAL_M_UNWRAP, _accounts[i]);
         }
     }
 

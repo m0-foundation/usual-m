@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.26;
 
-import { UCToken } from "../../src/token/UCToken.sol";
+import { UsualM } from "../../src/token/UsualM.sol";
 
-contract UCTokenHarness is UCToken {
+contract UsualMHarness is UsualM {
     function internalWrap(address account, address recipient, uint256 amount) external returns (uint256) {
         return _wrap(smartMToken(), account, recipient, amount);
     }
