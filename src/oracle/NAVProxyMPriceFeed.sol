@@ -12,8 +12,11 @@ import { AggregatorV3Interface } from "./AggregatorV3Interface.sol";
  * @author M^0 Labs
  */
 contract NAVProxyMPriceFeed is AggregatorV3Interface {
-    /// @notice NAV price threshold that defines 1$ M price
-    int256 public constant NAV_POSITIVE_THRESHOLD = 1e6;
+    /// @notice Emitted when NAV oracle has invalid decimals number.
+    error InvalidDecimalsNumber();
+
+    /// @notice NAV price threshold that defines 1$ M price.
+    int256 public constant NAV_POSITIVE_THRESHOLD = 1e8;
 
     /// @notice The address of the NAV Oracle from which NAV data is fetched.
     address public immutable navOracle;
@@ -23,12 +26,14 @@ contract NAVProxyMPriceFeed is AggregatorV3Interface {
      * @param  navOracle_ The address of the NAV Oracle.
      */
     constructor(address navOracle_) {
+        if (AggregatorV3Interface(navOracle_).decimals() != 8) revert InvalidDecimalsNumber();
+
         navOracle = navOracle_;
     }
 
     /// @inheritdoc AggregatorV3Interface
     function decimals() public pure returns (uint8) {
-        return 6;
+        return 8;
     }
 
     /// @inheritdoc AggregatorV3Interface
@@ -75,6 +80,6 @@ contract NAVProxyMPriceFeed is AggregatorV3Interface {
      * @return        The M price.
      */
     function _getPriceFromNAV(int256 answer) internal pure returns (int256) {
-        return (answer >= NAV_POSITIVE_THRESHOLD) ? int256(10 ** decimals()) : answer;
+        return answer >= NAV_POSITIVE_THRESHOLD ? NAV_POSITIVE_THRESHOLD : answer;
     }
 }

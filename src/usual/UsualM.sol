@@ -11,8 +11,6 @@ import {
 import {
     ERC20PermitUpgradeable
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PermitUpgradeable.sol";
-import { SafeERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ERC20 } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -27,8 +25,6 @@ import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "./con
  * @author M^0 Labs
  */
 contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
-    using SafeERC20 for ERC20;
-
     /* ============ Structs, Variables, Modifiers ============ */
 
     /// @custom:storage-location erc7201:UsualM.storage.v0
@@ -106,7 +102,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     ) external returns (uint256) {
         address smartM_ = smartM();
 
-        ISmartMLike(smartM_).permit(msg.sender, address(this), amount, deadline, v, r, s);
+        try ISmartMLike(smartM_).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
 
         return _wrap(smartM_, msg.sender, recipient, amount);
     }
@@ -242,6 +238,6 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         UsualMStorageV0 storage $ = _usualMStorageV0();
         if ($.isBlacklisted[from] || $.isBlacklisted[to]) revert Blacklisted();
 
-        super._update(from, to, amount);
+        ERC20PausableUpgradeable._update(from, to, amount);
     }
 }
