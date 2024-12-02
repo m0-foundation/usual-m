@@ -112,7 +112,7 @@ interface IUsualM is IERC20Metadata {
 
     /* ============ View/Pure Functions ============ */
 
-    /// @notice Returns wheather account is blacklisted.
+    /// @notice Returns whether the account is blacklisted.
     function isBlacklisted(address account) external view returns (bool);
 
     /// @notice Returns the SmartM Token address.
