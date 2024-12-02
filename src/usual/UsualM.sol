@@ -102,6 +102,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     ) external returns (uint256) {
         address smartM_ = smartM();
 
+        // NOTE: `permit` call failures can be safely ignored to remove the risk of transactions being reverted due to front-run.
         try ISmartMLike(smartM_).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
 
         return _wrap(smartM_, msg.sender, recipient, amount);
