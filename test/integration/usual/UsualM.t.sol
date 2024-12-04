@@ -48,7 +48,7 @@ contract UsualMIntegrationTests is TestBase {
 
         // Claim yield by unwrapping
         vm.prank(_alice);
-        _usualM.unwrap(_alice);
+        _usualM.unwrap(_alice, amount);
 
         // Check balances of UsualM and Alice after unwrapping
         assertEq(_usualM.balanceOf(_alice), 0);

@@ -68,7 +68,7 @@ contract UsualMUnitTests is Test {
     /* ============ wrap ============ */
     function test_wrap_wholeBalance() external {
         vm.prank(_alice);
-        _usualM.wrap(_alice);
+        _usualM.wrap(_alice, 10e6);
 
         assertEq(_smartMToken.balanceOf(_alice), 0);
         assertEq(_smartMToken.balanceOf(address(_usualM)), 10e6);
@@ -120,7 +120,7 @@ contract UsualMUnitTests is Test {
         assertEq(_usualM.balanceOf(_alice), 10e6);
 
         vm.prank(_alice);
-        _usualM.unwrap(_alice);
+        _usualM.unwrap(_alice, 10e6);
 
         assertEq(_smartMToken.balanceOf(_alice), 10e6);
         assertEq(_smartMToken.balanceOf(address(_usualM)), 0);
@@ -139,7 +139,7 @@ contract UsualMUnitTests is Test {
         vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
-        _usualM.unwrap(_other);
+        _usualM.unwrap(_other, 10e6);
     }
 
     /* ============ pause ============ */
@@ -165,7 +165,7 @@ contract UsualMUnitTests is Test {
 
     function test_pause_unwrap() external {
         vm.prank(_alice);
-        _usualM.wrap(_alice);
+        _usualM.wrap(_alice, 10e6);
 
         vm.prank(_pauser);
         _usualM.pause();
@@ -173,7 +173,7 @@ contract UsualMUnitTests is Test {
         vm.expectRevert(Pausable.EnforcedPause.selector);
 
         vm.prank(_alice);
-        _usualM.unwrap(_bob);
+        _usualM.unwrap(_bob, 10e6);
     }
 
     function test_pause_unauthorized() external {

@@ -78,14 +78,6 @@ contract TestBase is Test {
         _usualM.wrap(recipient_, amount_);
     }
 
-    function _wrap(address account_, address recipient_) internal {
-        vm.prank(account_);
-        _smartMToken.approve(address(_usualM), type(uint256).max);
-
-        vm.prank(account_);
-        _usualM.wrap(recipient_);
-    }
-
     function _wrapWithPermitVRS(
         address account_,
         uint256 signerPrivateKey_,
@@ -103,11 +95,6 @@ contract TestBase is Test {
     function _unwrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
         _usualM.unwrap(recipient_, amount_);
-    }
-
-    function _unwrap(address account_, address recipient_) internal {
-        vm.prank(account_);
-        _usualM.unwrap(recipient_);
     }
 
     function _set(bytes32 key_, bytes32 value_) internal {

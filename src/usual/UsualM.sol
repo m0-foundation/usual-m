@@ -86,12 +86,6 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     }
 
     /// @inheritdoc IUsualM
-    function wrap(address recipient) external returns (uint256) {
-        address smartM_ = smartM();
-        return _wrap(smartM_, msg.sender, recipient, ISmartMLike(smartM_).balanceOf(msg.sender));
-    }
-
-    /// @inheritdoc IUsualM
     function wrapWithPermit(
         address recipient,
         uint256 amount,
@@ -111,11 +105,6 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     /// @inheritdoc IUsualM
     function unwrap(address recipient, uint256 amount) external onlyMatchingRole(USUAL_M_UNWRAP) returns (uint256) {
         return _unwrap(msg.sender, recipient, amount);
-    }
-
-    /// @inheritdoc IUsualM
-    function unwrap(address recipient) external onlyMatchingRole(USUAL_M_UNWRAP) returns (uint256) {
-        return _unwrap(msg.sender, recipient, balanceOf(msg.sender));
     }
 
     /* ============ Special Admin Functions ============ */

@@ -48,13 +48,6 @@ interface IUsualM is IERC20Metadata {
     function wrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Wraps all the SmartM from the caller into UsualM for `recipient`.
-     * @param  recipient The account receiving the minted UsualM.
-     * @return           The amount of UsualM minted.
-     */
-    function wrap(address recipient) external returns (uint256);
-
-    /**
      * @notice Wraps `amount` SmartM from the caller into UsualM for `recipient`, using a permit.
      * @param  recipient The account receiving the minted UsualM.
      * @param  amount    The amount of SmartM deposited.
@@ -80,13 +73,6 @@ interface IUsualM is IERC20Metadata {
      * @return           The amount of SmartM withdrawn.
      */
     function unwrap(address recipient, uint256 amount) external returns (uint256);
-
-    /**
-     * @notice Unwraps all the UsualM from the caller into SmartM for `recipient`.
-     * @param  recipient The account receiving the withdrawn SmartM.
-     * @return           The amount of SmartM withdrawn.
-     */
-    function unwrap(address recipient) external returns (uint256);
 
     /**
      * @notice Adds an address to the blacklist.
