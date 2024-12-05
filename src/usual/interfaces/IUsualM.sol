@@ -38,7 +38,7 @@ interface IUsualM is IERC20Metadata {
     error ZeroWrappedM();
 
     /// @notice Emitted if Registry Access is 0x0.
-    error ZeroRegistryAccess();\
+    error ZeroRegistryAccess();
 
     /// @notice Emitted if mint cap is exceeded.
     error MintCapExceeded();
