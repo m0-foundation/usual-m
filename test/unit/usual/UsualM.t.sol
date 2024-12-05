@@ -7,7 +7,13 @@ import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pa
 
 import { MockWrappedM, MockRegistryAccess } from "../../utils/Mocks.sol";
 
-import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../../src/usual/constants.sol";
+import {
+    DEFAULT_ADMIN_ROLE,
+    USUAL_M_UNWRAP,
+    USUAL_M_PAUSE_UNPAUSE,
+    BLACKLIST_ROLE,
+    USUAL_M_MINTCAP_ALLOCATOR
+} from "../../../src/usual/constants.sol";
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
@@ -24,6 +30,10 @@ contract UsualMUnitTests is Test {
     address internal _david = makeAddr("david");
 
     address internal _other = makeAddr("other");
+
+    address internal _blacklister = makeAddr("blacklister");
+
+    address internal _mintCapAllocator = makeAddr("mintCapAllocator");
 
     address[] internal _accounts = [_alice, _bob, _charlie, _david];
 
@@ -47,13 +57,21 @@ contract UsualMUnitTests is Test {
         vm.prank(_admin);
         _registryAccess.grantRole(USUAL_M_PAUSE_UNPAUSE, _pauser);
 
-        // Fund accounts with WrappedM tokens and allow them to unwrap.
+        // Grant BLACKLIST_ROLE to the blacklister instead of admin
+        vm.prank(_admin);
+        _registryAccess.grantRole(BLACKLIST_ROLE, _blacklister);
+
+        // Fund accounts with SmartM tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
             _wrappedM.setBalanceOf(_accounts[i], 10e6);
 
             vm.prank(_admin);
             _registryAccess.grantRole(USUAL_M_UNWRAP, _accounts[i]);
         }
+
+        // Add mint cap allocator role to a separate address
+        vm.prank(_admin);
+        _registryAccess.grantRole(USUAL_M_MINTCAP_ALLOCATOR, _mintCapAllocator);
     }
 
     /* ============ initialization ============ */
@@ -194,7 +212,7 @@ contract UsualMUnitTests is Test {
     function test_blacklisted_wrap() external {
         assertEq(_usualM.isBlacklisted(_alice), false);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(_alice);
 
         assertEq(_usualM.isBlacklisted(_alice), true);
@@ -211,7 +229,7 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(_alice);
 
         assertEq(_usualM.isBlacklisted(_alice), true);
@@ -226,7 +244,7 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(_alice);
 
         vm.expectRevert(IUsualM.Blacklisted.selector);
@@ -239,7 +257,7 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(_bob);
 
         vm.expectRevert(IUsualM.Blacklisted.selector);
@@ -263,7 +281,7 @@ contract UsualMUnitTests is Test {
     }
 
     function test_blacklist_unBlacklist() external {
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(_alice);
 
         assertEq(_usualM.isBlacklisted(_alice), true);
@@ -273,7 +291,7 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.unBlacklist(_alice);
 
         vm.prank(_alice);
@@ -286,31 +304,31 @@ contract UsualMUnitTests is Test {
     function test_blacklist_zeroAddress() external {
         vm.expectRevert(IUsualM.ZeroAddress.selector);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(address(0));
     }
 
     function test_unBlacklist_zeroAddress() external {
         vm.expectRevert(IUsualM.ZeroAddress.selector);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.unBlacklist(address(0));
     }
 
     function test_blacklist_sameValue() external {
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(_alice);
 
         vm.expectRevert(IUsualM.SameValue.selector);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.blacklist(_alice);
     }
 
     function test_unBlacklist_sameValue() external {
         vm.expectRevert(IUsualM.SameValue.selector);
 
-        vm.prank(_admin);
+        vm.prank(_blacklister);
         _usualM.unBlacklist(_alice);
     }
 
@@ -320,5 +338,95 @@ contract UsualMUnitTests is Test {
         bytes32 INITIALIZABLE_STORAGE = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;
         // Set the storage slot to uninitialized
         vm.store(address(implementation), INITIALIZABLE_STORAGE, 0);
+    }
+
+    /* ============ mint cap ============ */
+    function test_setUsualMMintcap() external {
+        vm.prank(_mintCapAllocator);
+        _usualM.setUsualMMintcap(100e6);
+
+        assertEq(_usualM.getMintCap(), 100e6);
+    }
+
+    function test_setUsualMMintcap_unauthorized() external {
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
+
+        vm.prank(_other);
+        _usualM.setUsualMMintcap(100e6);
+    }
+
+    function test_setUsualMMintcap_sameValue() external {
+        vm.prank(_mintCapAllocator);
+        _usualM.setUsualMMintcap(100e6);
+
+        vm.expectRevert(IUsualM.SameValue.selector);
+
+        vm.prank(_mintCapAllocator);
+        _usualM.setUsualMMintcap(100e6);
+    }
+
+    function test_getWrappableAmount() external {
+        vm.prank(_mintCapAllocator);
+        _usualM.setUsualMMintcap(100e6);
+
+        // Initially, wrappable amount should be the full mint cap
+        assertEq(_usualM.getWrappableAmount(0), 100e6);
+
+        // Wrap some tokens
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 40e6);
+
+        // Check wrappable amount with no additional wrapping
+        assertEq(_usualM.getWrappableAmount(0), 60e6);
+
+        // Check wrappable amount considering a potential wrap
+        assertEq(_usualM.getWrappableAmount(20e6), 40e6);
+    }
+
+    function test_wrap_exceedsMintCap() external {
+        vm.prank(_mintCapAllocator);
+        _usualM.setUsualMMintcap(5e6);
+
+        vm.expectRevert(IUsualM.MintCapExceeded.selector);
+
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 10e6);
+    }
+
+    function test_wrap_upToMintCap() external {
+        vm.prank(_mintCapAllocator);
+        _usualM.setUsualMMintcap(15e6);
+
+        // First wrap should succeed
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 10e6);
+
+        // Second wrap should succeed (within cap)
+        vm.prank(_bob);
+        _usualM.wrap(_bob, 5e6);
+
+        // Third wrap should fail (exceeds cap)
+        vm.expectRevert(IUsualM.MintCapExceeded.selector);
+
+        vm.prank(_charlie);
+        _usualM.wrap(_charlie, 1e6);
+    }
+
+    function testFuzz_wrap_withMintCap(uint256 mintCap, uint256 wrapAmount) external {
+        mintCap = bound(mintCap, 1e6, 1e9);
+        wrapAmount = bound(wrapAmount, 0, mintCap);
+
+        vm.prank(_mintCapAllocator);
+        _usualM.setUsualMMintcap(mintCap);
+
+        // Wrap tokens up to the mint cap
+        vm.prank(_alice);
+        _usualM.wrap(_alice, wrapAmount);
+
+        // Check that the total supply does not exceed the mint cap
+        assertLe(_usualM.totalSupply(), mintCap);
+
+        // Check that the wrapped amount is correct
+        assertEq(_usualM.balanceOf(_alice), wrapAmount);
     }
 }

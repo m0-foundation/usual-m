@@ -19,6 +19,9 @@ interface IUsualM is IERC20Metadata {
     /// @notice Emitted when address is removed from blacklist.
     event UnBlacklist(address indexed account);
 
+    /// @notice Emitted when mint cap is set.
+    event MintCapSet(uint256 newMintCap);
+
     /// @notice Emitted when token transfers/wraps are attempted by blacklisted account.
     error Blacklisted();
 
@@ -106,4 +109,14 @@ interface IUsualM is IERC20Metadata {
 
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);
+
+    /// @notice Sets the mint cap.
+    /// @dev Can only be called by the USUAL_M_MINTCAP_ALLOCATOR.
+    function setUsualMMintcap(uint256 newMintCap) external;
+
+    /// @notice Returns the mint cap.
+    function getMintCap() external view returns (uint256);
+
+    /// @notice Returns the wrappable amount.
+    function getWrappableAmount(uint256 amount) external view returns (uint256);
 }
