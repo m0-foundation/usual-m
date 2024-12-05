@@ -12,7 +12,7 @@ import {
 } from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract DeployUsualMScript is Script {
-    address internal constant _SMART_M_TOKEN = 0x437cc33344a0B27A429f795ff6B469C72698B291; // Mainnet Smart M
+    address internal constant _WRAPPED_M_TOKEN = 0x437cc33344a0B27A429f795ff6B469C72698B291; // Mainnet Wrapped M
 
     address internal constant _USUAL_REGISTRY_ACCESS = 0x0D374775E962c3608B8F0A4b8B10567DF739bb56; // Usual registry access
 
@@ -32,7 +32,7 @@ contract DeployUsualMScript is Script {
         address usualMImplementation = address(new UsualM());
         bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
-            _SMART_M_TOKEN,
+            _WRAPPED_M_TOKEN,
             _USUAL_REGISTRY_ACCESS
         );
         address usualM = address(new TransparentUpgradeableProxy(usualMImplementation, _USUAL_ADMIN, usualMData));

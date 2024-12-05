@@ -7,7 +7,7 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
- * @title  Usual SmartM Extension.
+ * @title  Usual WrappedM Extension.
  * @author M^0 Labs
  */
 interface IUsualM is IERC20Metadata {
@@ -31,8 +31,8 @@ interface IUsualM is IERC20Metadata {
     /// @notice Emitted if account is 0x0.
     error ZeroAddress();
 
-    /// @notice Emitted if SmartM Token is 0x0.
-    error ZeroSmartM();
+    /// @notice Emitted if WrappedM Token is 0x0.
+    error ZeroWrappedM();
 
     /// @notice Emitted if Registry Access is 0x0.
     error ZeroRegistryAccess();
@@ -40,17 +40,17 @@ interface IUsualM is IERC20Metadata {
     /* ============ Interactive Functions ============ */
 
     /**
-     * @notice Wraps `amount` SmartM from the caller into UsualM for `recipient`.
+     * @notice Wraps `amount` WrappedM from the caller into UsualM for `recipient`.
      * @param  recipient The account receiving the minted UsualM.
-     * @param  amount    The amount of SmartM deposited.
+     * @param  amount    The amount of WrappedM deposited.
      * @return           The amount of UsualM minted.
      */
     function wrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Wraps `amount` SmartM from the caller into UsualM for `recipient`, using a permit.
+     * @notice Wraps `amount` WrappedM from the caller into UsualM for `recipient`, using a permit.
      * @param  recipient The account receiving the minted UsualM.
-     * @param  amount    The amount of SmartM deposited.
+     * @param  amount    The amount of WrappedM deposited.
      * @param  deadline  The last timestamp where the signature is still valid.
      * @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
@@ -67,10 +67,10 @@ interface IUsualM is IERC20Metadata {
     ) external returns (uint256);
 
     /**
-     * @notice Unwraps `amount` UsualM from the caller into SmartM for `recipient`.
-     * @param  recipient The account receiving the withdrawn SmartM.
+     * @notice Unwraps `amount` UsualM from the caller into WrappedM for `recipient`.
+     * @param  recipient The account receiving the withdrawn WrappedM.
      * @param  amount    The amount of UsualM burned.
-     * @return           The amount of SmartM withdrawn.
+     * @return           The amount of WrappedM withdrawn.
      */
     function unwrap(address recipient, uint256 amount) external returns (uint256);
 
@@ -101,8 +101,8 @@ interface IUsualM is IERC20Metadata {
     /// @notice Returns whether the account is blacklisted.
     function isBlacklisted(address account) external view returns (bool);
 
-    /// @notice Returns the SmartM Token address.
-    function smartM() external view returns (address);
+    /// @notice Returns the WrappedM Token address.
+    function wrappedM() external view returns (address);
 
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);

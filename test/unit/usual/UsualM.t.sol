@@ -5,7 +5,7 @@ pragma solidity 0.8.26;
 import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
 import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
-import { MockSmartM, MockRegistryAccess } from "../../utils/Mocks.sol";
+import { MockWrappedM, MockRegistryAccess } from "../../utils/Mocks.sol";
 
 import { DEFAULT_ADMIN_ROLE, USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE } from "../../../src/usual/constants.sol";
 import { UsualM } from "../../../src/usual/UsualM.sol";
@@ -27,13 +27,13 @@ contract UsualMUnitTests is Test {
 
     address[] internal _accounts = [_alice, _bob, _charlie, _david];
 
-    MockSmartM internal _smartMToken;
+    MockWrappedM internal _wrappedM;
     MockRegistryAccess internal _registryAccess;
 
     UsualM internal _usualM;
 
     function setUp() external {
-        _smartMToken = new MockSmartM();
+        _wrappedM = new MockWrappedM();
         _registryAccess = new MockRegistryAccess();
 
         // Set default admin role.
@@ -41,15 +41,15 @@ contract UsualMUnitTests is Test {
 
         _usualM = new UsualM();
         _resetInitializerImplementation(address(_usualM));
-        _usualM.initialize(address(_smartMToken), address(_registryAccess));
+        _usualM.initialize(address(_wrappedM), address(_registryAccess));
 
         // Set pauser/unpauser role.
         vm.prank(_admin);
         _registryAccess.grantRole(USUAL_M_PAUSE_UNPAUSE, _pauser);
 
-        // Fund accounts with SmartM tokens and allow them to unwrap.
+        // Fund accounts with WrappedM tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _smartMToken.setBalanceOf(_accounts[i], 10e6);
+            _wrappedM.setBalanceOf(_accounts[i], 10e6);
 
             vm.prank(_admin);
             _registryAccess.grantRole(USUAL_M_UNWRAP, _accounts[i]);
@@ -58,7 +58,7 @@ contract UsualMUnitTests is Test {
 
     /* ============ initialization ============ */
     function test_init() external view {
-        assertEq(_usualM.smartM(), address(_smartMToken));
+        assertEq(_usualM.wrappedM(), address(_wrappedM));
         assertEq(_usualM.registryAccess(), address(_registryAccess));
         assertEq(_usualM.name(), "UsualM");
         assertEq(_usualM.symbol(), "USUALM");
@@ -70,8 +70,8 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        assertEq(_smartMToken.balanceOf(_alice), 0);
-        assertEq(_smartMToken.balanceOf(address(_usualM)), 10e6);
+        assertEq(_wrappedM.balanceOf(_alice), 0);
+        assertEq(_wrappedM.balanceOf(address(_usualM)), 10e6);
 
         assertEq(_usualM.balanceOf(_alice), 10e6);
     }
@@ -80,8 +80,8 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 5e6);
 
-        assertEq(_smartMToken.balanceOf(_alice), 5e6);
-        assertEq(_smartMToken.balanceOf(address(_usualM)), 5e6);
+        assertEq(_wrappedM.balanceOf(_alice), 5e6);
+        assertEq(_wrappedM.balanceOf(address(_usualM)), 5e6);
 
         assertEq(_usualM.balanceOf(_alice), 5e6);
     }
@@ -90,8 +90,8 @@ contract UsualMUnitTests is Test {
         vm.prank(_bob);
         _usualM.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0));
 
-        assertEq(_smartMToken.balanceOf(_alice), 10e6);
-        assertEq(_smartMToken.balanceOf(address(_usualM)), 5e6);
+        assertEq(_wrappedM.balanceOf(_alice), 10e6);
+        assertEq(_wrappedM.balanceOf(address(_usualM)), 5e6);
         assertEq(_usualM.balanceOf(_alice), 5e6);
 
         assertEq(_usualM.balanceOf(_bob), 0);
@@ -105,8 +105,8 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.unwrap(_alice, 5e6);
 
-        assertEq(_smartMToken.balanceOf(_alice), 5e6);
-        assertEq(_smartMToken.balanceOf(address(_usualM)), 5e6);
+        assertEq(_wrappedM.balanceOf(_alice), 5e6);
+        assertEq(_wrappedM.balanceOf(address(_usualM)), 5e6);
 
         assertEq(_usualM.balanceOf(_alice), 5e6);
     }
@@ -115,15 +115,15 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        assertEq(_smartMToken.balanceOf(_alice), 0);
-        assertEq(_smartMToken.balanceOf(address(_usualM)), 10e6);
+        assertEq(_wrappedM.balanceOf(_alice), 0);
+        assertEq(_wrappedM.balanceOf(address(_usualM)), 10e6);
         assertEq(_usualM.balanceOf(_alice), 10e6);
 
         vm.prank(_alice);
         _usualM.unwrap(_alice, 10e6);
 
-        assertEq(_smartMToken.balanceOf(_alice), 10e6);
-        assertEq(_smartMToken.balanceOf(address(_usualM)), 0);
+        assertEq(_wrappedM.balanceOf(_alice), 10e6);
+        assertEq(_wrappedM.balanceOf(address(_usualM)), 0);
 
         assertEq(_usualM.balanceOf(_alice), 0);
     }

@@ -70,7 +70,7 @@ contract NAVProxyMPriceFeed is AggregatorV3Interface {
     {
         (roundId, answer, startedAt, updatedAt, answeredInRound) = AggregatorV3Interface(navOracle).latestRoundData();
 
-        // Convert NAV price to Smart M price given predefined threshold.
+        // Convert NAV price to M price given predefined threshold.
         answer = _getPriceFromNAV(answer);
     }
 

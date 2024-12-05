@@ -3,10 +3,10 @@
 pragma solidity 0.8.26;
 
 /**
- * @title  Subset of Smart M Token interface required for source contracts.
+ * @title  Subset of Wrapped M Token interface required for source contracts.
  * @author M^0 Labs
  */
-interface ISmartMLike {
+interface IWrappedMLike {
     /* ============ Interactive Functions ============ */
 
     /**

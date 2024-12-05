@@ -8,7 +8,7 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
-import { ISmartMLike } from "../../../src/usual/interfaces/ISmartMLike.sol";
+import { IWrappedMLike } from "../../../src/usual/interfaces/IWrappedMLike.sol";
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
 import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
 
@@ -23,10 +23,10 @@ contract TestBase is Test {
     bytes32 internal constant _EARNERS_LIST = "earners";
     bytes32 internal constant _CLAIM_OVERRIDE_RECIPIENT_PREFIX = "wm_claim_override_recipient";
 
-    ISmartMLike internal constant _smartMToken = ISmartMLike(0x437cc33344a0B27A429f795ff6B469C72698B291);
+    IWrappedMLike internal constant _wrappedM = IWrappedMLike(0x437cc33344a0B27A429f795ff6B469C72698B291);
 
-    // Large SmartM holder on Ethereum Mainnet
-    address internal constant _smartMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
+    // Large WrappedM holder on Ethereum Mainnet
+    address internal constant _wrappedMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
 
     IRegistryAccess internal constant _registryAccess = IRegistryAccess(0x0D374775E962c3608B8F0A4b8B10567DF739bb56);
     address internal _admin = _registryAccess.defaultAdmin();
@@ -61,9 +61,9 @@ contract TestBase is Test {
         IRegistrarLike(_registrar).removeFromList(list_, account_);
     }
 
-    function _giveSmartM(address account_, uint256 amount_) internal {
-        vm.prank(_smartMSource);
-        _smartMToken.transfer(account_, amount_);
+    function _giveWrappedM(address account_, uint256 amount_) internal {
+        vm.prank(_wrappedMSource);
+        _wrappedM.transfer(account_, amount_);
     }
 
     function _giveEth(address account_, uint256 amount_) internal {
@@ -72,7 +72,7 @@ contract TestBase is Test {
 
     function _wrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _smartMToken.approve(address(_usualM), amount_);
+        _wrappedM.approve(address(_usualM), amount_);
 
         vm.prank(account_);
         _usualM.wrap(recipient_, amount_);
@@ -110,7 +110,7 @@ contract TestBase is Test {
         _usualMImplementation = address(new UsualM());
         bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
-            address(_smartMToken),
+            address(_wrappedM),
             _registryAccess
         );
         _usualM = IUsualM(address(new TransparentUpgradeableProxy(_usualMImplementation, _admin, usualMData)));
@@ -118,7 +118,7 @@ contract TestBase is Test {
 
     function _fundAccounts() internal {
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _giveSmartM(_accounts[i], 10e6);
+            _giveWrappedM(_accounts[i], 10e6);
             _giveEth(_accounts[i], 0.1 ether);
         }
     }
@@ -152,12 +152,12 @@ contract TestBase is Test {
                 keccak256(
                     abi.encodePacked(
                         "\x19\x01",
-                        _smartMToken.DOMAIN_SEPARATOR(),
+                        _wrappedM.DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                _smartMToken.PERMIT_TYPEHASH(),
+                                _wrappedM.PERMIT_TYPEHASH(),
                                 account_,
-                                address(_smartMToken),
+                                address(_wrappedM),
                                 amount_,
                                 nonce_,
                                 deadline_
