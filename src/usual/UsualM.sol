@@ -182,7 +182,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /**
      * @dev    Wraps `amount` M from `account` into UsualM for `recipient`.
-     * @param  wrappedM_    The address of the WrappedM token.
+     * @param  wrappedM_   The address of the WrappedM token.
      * @param  account    The account from which M is deposited.
      * @param  recipient  The account receiving the minted UsualM.
      * @param  amount     The amount of WrappedM deposited.
