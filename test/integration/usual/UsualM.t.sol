@@ -34,9 +34,14 @@ contract UsualMIntegrationTests is TestBase {
 
         // Add UsualM to the list of earners
         _setClaimOverrideRecipient(address(_usualM), _treasury);
+
         // Add treasury as a recipient of UsualM yield
         _addToList(_EARNERS_LIST, address(_usualM));
         _wrappedM.startEarningFor(address(_usualM));
+
+        // Set Mit Cap
+        vm.prank(_admin);
+        _usualM.setMintCap(10_000e6);
     }
 
     function test_integration_constants() external view {

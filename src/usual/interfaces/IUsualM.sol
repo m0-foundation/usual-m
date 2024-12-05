@@ -74,6 +74,7 @@ interface IUsualM is IERC20Metadata {
 
     /**
      * @notice Unwraps `amount` UsualM from the caller into WrappedM for `recipient`.
+     * @dev Can only be called by the `USUAL_M_UNWRAP`.
      * @param  recipient The account receiving the withdrawn WrappedM.
      * @param  amount    The amount of UsualM burned.
      * @return           The amount of WrappedM withdrawn.
@@ -82,25 +83,29 @@ interface IUsualM is IERC20Metadata {
 
     /**
      * @notice Adds an address to the blacklist.
-     * @dev Can only be called by the admin.
+     * @dev Can only be called by the `BLACKLIST_ROLE`.
      * @param account The address to be blacklisted.
      */
     function blacklist(address account) external;
 
     /**
      * @notice Removes an address from the blacklist.
-     * @dev Can only be called by the admin.
+     * @dev Can only be called by the `BLACKLIST_ROLE`.
      * @param account The address to be removed from the blacklist.
      */
     function unBlacklist(address account) external;
 
     /// @notice Pauses all token transfers.
-    /// @dev Can only be called by the admin.
+    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE`.
     function pause() external;
 
     /// @notice Unpauses all token transfers.
-    /// @dev Can only be called by the admin.
+    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE`.
     function unpause() external;
+
+    /// @notice Sets the mint cap.
+    /// @dev Can only be called by the `USUAL_M_MINTCAP_ALLOCATOR`.
+    function setMintCap(uint256 newMintCap) external;
 
     /* ============ View/Pure Functions ============ */
 
@@ -113,13 +118,9 @@ interface IUsualM is IERC20Metadata {
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);
 
-    /// @notice Sets the mint cap.
-    /// @dev Can only be called by the USUAL_M_MINTCAP_ALLOCATOR.
-    function setUsualMMintcap(uint256 newMintCap) external;
+    /// @notice Returns the Mint Cap amount.
+    function mintCap() external view returns (uint256);
 
-    /// @notice Returns the mint cap.
-    function getMintCap() external view returns (uint256);
-
-    /// @notice Returns the wrappable amount.
+    /// @notice Returns the available wrappable amount for the current values of `mintCap` and `totalSupply`.
     function getWrappableAmount(uint256 amount) external view returns (uint256);
 }

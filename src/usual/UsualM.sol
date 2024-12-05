@@ -18,13 +18,7 @@ import { IWrappedMLike } from "./interfaces/IWrappedMLike.sol";
 import { IUsualM } from "./interfaces/IUsualM.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
 
-import {
-    DEFAULT_ADMIN_ROLE,
-    USUAL_M_UNWRAP,
-    USUAL_M_PAUSE_UNPAUSE,
-    BLACKLIST_ROLE,
-    USUAL_M_MINTCAP_ALLOCATOR
-} from "./constants.sol";
+import { USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE, BLACKLIST_ROLE, USUAL_M_MINTCAP_ALLOCATOR } from "./constants.sol";
 
 /**
  * @title  Usual Wrapped M Extension.
@@ -116,11 +110,17 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /* ============ Special Admin Functions ============ */
 
-    function setUsualMMintcap(uint256 newMintCap) external onlyMatchingRole(USUAL_M_MINTCAP_ALLOCATOR) {
+    /// @inheritdoc IUsualM
+    function setMintCap(uint256 newMintCap) external {
+        // NOTE: Avoid reading storage twice while using `onlyMatchingRole` modifier.
         UsualMStorageV0 storage $ = _usualMStorageV0();
+        if (!IRegistryAccess($.registryAccess).hasRole(USUAL_M_MINTCAP_ALLOCATOR, msg.sender)) revert NotAuthorized();
+
+        // Revert if the new mint cap is the same as the current mint cap.
         if (newMintCap == $.mintCap) revert SameValue();
 
         $.mintCap = newMintCap;
+
         emit MintCapSet(newMintCap);
     }
 
@@ -188,28 +188,30 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     }
 
     /// @inheritdoc IUsualM
+    function mintCap() public view returns (uint256) {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+        return $.mintCap;
+    }
+
+    /// @inheritdoc IUsualM
     function isBlacklisted(address account) external view returns (bool) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
         return $.isBlacklisted[account];
     }
 
     /// @inheritdoc IUsualM
-    function getMintCap() external view returns (uint256) {
-        UsualMStorageV0 storage $ = _usualMStorageV0();
-        return $.mintCap;
-    }
-
-    /// @inheritdoc IUsualM
     function getWrappableAmount(uint256 amount) external view returns (uint256) {
-        UsualMStorageV0 storage $ = _usualMStorageV0();
-        return $.mintCap - totalSupply() - amount;
+        uint256 totalSupply_ = totalSupply();
+        uint256 mintCap_ = mintCap();
+
+        return _min(amount, mintCap_ > totalSupply_ ? mintCap_ - totalSupply_ : 0);
     }
 
     /* ============ Internal Interactive Functions ============ */
 
     /**
      * @dev    Wraps `amount` M from `account` into UsualM for `recipient`.
-     * @param  wrappedM_   The address of the WrappedM token.
+     * @param  wrappedM_  The address of the WrappedM token.
      * @param  account    The account from which M is deposited.
      * @param  recipient  The account receiving the minted UsualM.
      * @param  amount     The amount of WrappedM deposited.
@@ -222,11 +224,12 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         uint256 amount
     ) internal returns (uint256 wrapped) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
-        // Check if the new total supply would exceed the mint cap
+
+        // Check if the new total supply would exceed the mint cap.
         if (totalSupply() + amount > $.mintCap) revert MintCapExceeded();
 
-        // NOTE: The behavior of `ISmartMLike.transferFrom` is known, so its return can be ignored.
-        ISmartMLike(smartM_).transferFrom(account, address(this), amount);
+        // NOTE: The behavior of `IWrappedMLike.transferFrom` is known, so its return can be ignored.
+        IWrappedMLike(wrappedM_).transferFrom(account, address(this), amount);
 
         _mint(recipient, wrapped = amount);
     }
@@ -260,5 +263,10 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         if ($.isBlacklisted[from] || $.isBlacklisted[to]) revert Blacklisted();
 
         ERC20PausableUpgradeable._update(from, to, amount);
+    }
+
+    /// @dev Compares two uint256 values and returns the lesser one.
+    function _min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
     }
 }
