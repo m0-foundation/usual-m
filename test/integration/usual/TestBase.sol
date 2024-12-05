@@ -36,17 +36,10 @@ contract TestBase is Test {
     address internal _alice = makeAddr("alice");
     address internal _bob = makeAddr("bob");
     address internal _carol = makeAddr("carol");
-    address internal _dave = makeAddr("dave");
-    address internal _eric = makeAddr("eric");
-    address internal _frank = makeAddr("frank");
-    address internal _grace = makeAddr("grace");
-    address internal _henry = makeAddr("henry");
-    address internal _ivan = makeAddr("ivan");
-    address internal _judy = makeAddr("judy");
 
     uint256 internal _aliceKey = _makeKey("alice");
 
-    address[] internal _accounts = [_alice, _bob, _carol, _dave, _eric, _frank, _grace, _henry, _ivan, _judy];
+    address[] internal _accounts = [_alice, _bob, _carol];
 
     address internal _usualMImplementation;
     IUsualM internal _usualM;
@@ -157,7 +150,7 @@ contract TestBase is Test {
                             abi.encode(
                                 _wrappedM.PERMIT_TYPEHASH(),
                                 account_,
-                                address(_wrappedM),
+                                address(_usualM),
                                 amount_,
                                 nonce_,
                                 deadline_
