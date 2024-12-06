@@ -18,7 +18,7 @@ import { IWrappedMLike } from "./interfaces/IWrappedMLike.sol";
 import { IUsualM } from "./interfaces/IUsualM.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
 
-import { USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE, BLACKLIST_ROLE, USUAL_M_MINTCAP_ALLOCATOR } from "./constants.sol";
+import { USUAL_M_UNWRAP, USUAL_M_PAUSE, USUAL_M_UNPAUSE, BLACKLIST_ROLE, USUAL_M_MINTCAP_ALLOCATOR } from "./constants.sol";
 
 /**
  * @title  Usual Wrapped M Extension.
@@ -126,12 +126,12 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     }
 
     /// @inheritdoc IUsualM
-    function pause() external onlyMatchingRole(USUAL_M_PAUSE_UNPAUSE) {
+    function pause() external onlyMatchingRole(USUAL_M_PAUSE) {
         _pause();
     }
 
     /// @inheritdoc IUsualM
-    function unpause() external onlyMatchingRole(USUAL_M_PAUSE_UNPAUSE) {
+    function unpause() external onlyMatchingRole(USUAL_M_UNPAUSE) {
         _unpause();
     }
 

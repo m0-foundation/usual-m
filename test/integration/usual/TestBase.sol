@@ -14,7 +14,7 @@ import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.s
 
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
-import { USUAL_M_UNWRAP, USUAL_M_PAUSE_UNPAUSE, USUAL_M_MINTCAP_ALLOCATOR } from "../../../src/usual/constants.sol";
+import { USUAL_M_UNWRAP, USUAL_M_PAUSE, USUAL_M_UNPAUSE, USUAL_M_MINTCAP_ALLOCATOR } from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
@@ -118,7 +118,9 @@ contract TestBase is Test {
 
     function _grantRoles() internal {
         vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(USUAL_M_PAUSE_UNPAUSE, _admin);
+        IRegistryAccess(_registryAccess).grantRole(USUAL_M_PAUSE, _admin);
+        vm.prank(_admin);
+        IRegistryAccess(_registryAccess).grantRole(USUAL_M_UNPAUSE, _admin);
 
         for (uint256 i = 0; i < _accounts.length; ++i) {
             vm.prank(_admin);
