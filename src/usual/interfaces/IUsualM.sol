@@ -40,8 +40,11 @@ interface IUsualM is IERC20Metadata {
     /// @notice Emitted if Registry Access is 0x0.
     error ZeroRegistryAccess();
 
-    /// @notice Emitted if mint cap is exceeded.
+    /// @notice Emitted if Mint Cap is exceeded.
     error MintCapExceeded();
+
+    /// @notice Emitted if Mint Cap > 2^96 - 1.
+    error InvalidUInt96();
 
     /* ============ Interactive Functions ============ */
 
@@ -96,15 +99,15 @@ interface IUsualM is IERC20Metadata {
     function unBlacklist(address account) external;
 
     /// @notice Pauses all token transfers.
-    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE`.
+    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE` role.
     function pause() external;
 
     /// @notice Unpauses all token transfers.
-    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE`.
+    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE` role.
     function unpause() external;
 
     /// @notice Sets the mint cap.
-    /// @dev Can only be called by the `USUAL_M_MINTCAP_ALLOCATOR`.
+    /// @dev Can only be called by the `USUAL_M_MINTCAP_ALLOCATOR` role.
     function setMintCap(uint256 newMintCap) external;
 
     /* ============ View/Pure Functions ============ */

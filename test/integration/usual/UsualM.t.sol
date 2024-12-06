@@ -39,7 +39,7 @@ contract UsualMIntegrationTests is TestBase {
         _addToList(_EARNERS_LIST, address(_usualM));
         _wrappedM.startEarningFor(address(_usualM));
 
-        // Set Mit Cap
+        // Set Mint Cap
         vm.prank(_admin);
         _usualM.setMintCap(10_000e6);
     }

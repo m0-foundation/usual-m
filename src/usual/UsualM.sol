@@ -29,10 +29,13 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /// @custom:storage-location erc7201:UsualM.storage.v0
     struct UsualMStorageV0 {
+        // 1st slot
+        uint96 mintCap;
         address wrappedM;
+        // 2nd slot
         address registryAccess;
+        // next slots
         mapping(address => bool) isBlacklisted;
-        uint256 mintCap;
     }
 
     // keccak256(abi.encode(uint256(keccak256("UsualM.storage.v0")) - 1)) & ~bytes32(uint256(0xff))
@@ -83,7 +86,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /// @inheritdoc IUsualM
     function wrap(address recipient, uint256 amount) external returns (uint256) {
-        return _wrap(wrappedM(), msg.sender, recipient, amount);
+        return _wrap(msg.sender, recipient, amount);
     }
 
     /// @inheritdoc IUsualM
@@ -95,12 +98,10 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         bytes32 r,
         bytes32 s
     ) external returns (uint256) {
-        address wrappedM_ = wrappedM();
-
         // NOTE: `permit` call failures can be safely ignored to remove the risk of transactions being reverted due to front-run.
-        try IWrappedMLike(wrappedM_).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
+        try IWrappedMLike(wrappedM()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
 
-        return _wrap(wrappedM_, msg.sender, recipient, amount);
+        return _wrap(msg.sender, recipient, amount);
     }
 
     /// @inheritdoc IUsualM
@@ -119,7 +120,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         // Revert if the new mint cap is the same as the current mint cap.
         if (newMintCap == $.mintCap) revert SameValue();
 
-        $.mintCap = newMintCap;
+        $.mintCap = _safe96(newMintCap);
 
         emit MintCapSet(newMintCap);
     }
@@ -210,26 +211,20 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     /* ============ Internal Interactive Functions ============ */
 
     /**
-     * @dev    Wraps `amount` M from `account` into UsualM for `recipient`.
-     * @param  wrappedM_  The address of the WrappedM token.
-     * @param  account    The account from which M is deposited.
+     * @dev    Wraps `amount` WrappedM from `account` into UsualM for `recipient`.
+     * @param  account    The account from which WrappedM is deposited.
      * @param  recipient  The account receiving the minted UsualM.
      * @param  amount     The amount of WrappedM deposited.
      * @return wrapped    The amount of UsualM minted.
      */
-    function _wrap(
-        address wrappedM_,
-        address account,
-        address recipient,
-        uint256 amount
-    ) internal returns (uint256 wrapped) {
+    function _wrap(address account, address recipient, uint256 amount) internal returns (uint256 wrapped) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
 
         // Check if the new total supply would exceed the mint cap.
         if (totalSupply() + amount > $.mintCap) revert MintCapExceeded();
 
         // NOTE: The behavior of `IWrappedMLike.transferFrom` is known, so its return can be ignored.
-        IWrappedMLike(wrappedM_).transferFrom(account, address(this), amount);
+        IWrappedMLike($.wrappedM).transferFrom(account, address(this), amount);
 
         _mint(recipient, wrapped = amount);
     }
@@ -268,5 +263,10 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     /// @dev Compares two uint256 values and returns the lesser one.
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
+    }
+
+    function _safe96(uint256 n) internal pure returns (uint96) {
+        if (n > type(uint96).max) revert InvalidUInt96();
+        return uint96(n);
     }
 }

@@ -410,6 +410,13 @@ contract UsualMUnitTests is Test {
         _usualM.setMintCap(100e6);
     }
 
+    function test_setMintCap_uint96() external {
+        vm.expectRevert(IUsualM.InvalidUInt96.selector);
+
+        vm.prank(_mintCapAllocator);
+        _usualM.setMintCap(2 ** 96);
+    }
+
     /* ============ wrappable amount ============ */
     function test_getWrappableAmount() external {
         vm.prank(_mintCapAllocator);
