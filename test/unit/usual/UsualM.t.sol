@@ -421,6 +421,14 @@ contract UsualMUnitTests is Test {
         _usualM.setMintCap(2 ** 96);
     }
 
+    function test_setMintCap_emitsEvent() external {
+        vm.expectEmit(false, false, false, true);
+        emit MintCapSet(100e6);
+        
+        vm.prank(_mintCapAllocator);
+        _usualM.setMintCap(100e6);
+    }
+
     /* ============ wrappable amount ============ */
     function test_getWrappableAmount() external {
         vm.prank(_mintCapAllocator);
