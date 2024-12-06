@@ -102,15 +102,20 @@ interface IUsualM is IERC20Metadata {
     function unBlacklist(address account) external;
 
     /// @notice Pauses all token transfers.
-    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE` role.
+    /// @dev Can only be called by the `USUAL_M_PAUSE` role.
     function pause() external;
 
     /// @notice Unpauses all token transfers.
-    /// @dev Can only be called by the `USUAL_M_PAUSE_UNPAUSE` role.
+    /// @dev Can only be called by the `USUAL_M_UNPAUSE` role.
     function unpause() external;
 
-    /// @notice Sets the mint cap.
-    /// @dev Can only be called by the `USUAL_M_MINTCAP_ALLOCATOR` role.
+    /**
+     * @notice Sets the mint cap.
+     * @param newMintCap The new mint cap, should be different from the current value.
+     * @dev The new mint cap should be less than or equal to 2^96 - 1.
+     * @dev Can only be called by the `USUAL_M_MINTCAP_ALLOCATOR` role.
+     * @dev number of deciamls is 6 for the mint cap value.
+     **/
     function setMintCap(uint256 newMintCap) external;
 
     /* ============ View/Pure Functions ============ */
