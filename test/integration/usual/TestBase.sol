@@ -119,6 +119,7 @@ contract TestBase is Test {
     function _grantRoles() internal {
         vm.prank(_admin);
         IRegistryAccess(_registryAccess).grantRole(USUAL_M_PAUSE, _admin);
+        vm.prank(_admin);
         IRegistryAccess(_registryAccess).grantRole(USUAL_M_UNPAUSE, _admin);
 
         for (uint256 i = 0; i < _accounts.length; ++i) {

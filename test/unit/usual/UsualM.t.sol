@@ -56,13 +56,14 @@ contract UsualMUnitTests is Test {
         _usualM.initialize(address(_wrappedM), address(_registryAccess));
 
         // Set pauser/unpauser role.
-        vm.startPrank(_admin);
+        vm.prank(_admin);
         _registryAccess.grantRole(USUAL_M_PAUSE, _pauser);
+        vm.prank(_admin);
         _registryAccess.grantRole(USUAL_M_UNPAUSE, _unpauser);
 
         // Grant BLACKLIST_ROLE to the blacklister instead of admin
+        vm.prank(_admin);
         _registryAccess.grantRole(BLACKLIST_ROLE, _blacklister);
-        vm.stopPrank();
 
         // Fund accounts with WrappedM tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
