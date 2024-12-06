@@ -125,6 +125,13 @@ contract UsualMUnitTests is Test {
         assertEq(_usualM.balanceOf(_bob), 0);
     }
 
+    function test_wrapWithPermit_invalidAmount() external {
+        vm.expectRevert(IUsualM.InvalidAmount.selector);
+
+        vm.prank(_bob);
+        _usualM.wrapWithPermit(_alice, 0, 0, 0, bytes32(0), bytes32(0));
+    }
+
     function test_wrap_exceedsMintCap() external {
         vm.prank(_mintCapAllocator);
         _usualM.setMintCap(5e6);
@@ -154,9 +161,16 @@ contract UsualMUnitTests is Test {
         _usualM.wrap(_charlie, 1e6);
     }
 
+    function test_wrap_invalidAmount() external {
+        vm.expectRevert(IUsualM.InvalidAmount.selector);
+
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 0);
+    }
+
     function testFuzz_wrap_withMintCap(uint256 mintCap, uint256 wrapAmount) external {
         mintCap = bound(mintCap, 1e6, 1e9);
-        wrapAmount = bound(wrapAmount, 0, mintCap);
+        wrapAmount = bound(wrapAmount, 1, mintCap);
 
         vm.prank(_mintCapAllocator);
         _usualM.setMintCap(mintCap);
@@ -212,11 +226,11 @@ contract UsualMUnitTests is Test {
         _usualM.unwrap(_other, 5e6);
     }
 
-    function test_unwarp_wholeBalance_notAllowed() external {
-        vm.expectRevert(IUsualM.NotAuthorized.selector);
+    function test_unwrap_invalidAmount() external {
+        vm.expectRevert(IUsualM.InvalidAmount.selector);
 
-        vm.prank(_other);
-        _usualM.unwrap(_other, 10e6);
+        vm.prank(_alice);
+        _usualM.unwrap(_alice, 0);
     }
 
     /* ============ pause ============ */
@@ -426,7 +440,7 @@ contract UsualMUnitTests is Test {
     function test_setMintCap_emitsEvent() external {
         vm.expectEmit(false, false, false, true);
         emit MintCapSet(100e6);
-        
+
         vm.prank(_mintCapAllocator);
         _usualM.setMintCap(100e6);
     }
