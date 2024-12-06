@@ -46,6 +46,9 @@ interface IUsualM is IERC20Metadata {
     /// @notice Emitted if Mint Cap > 2^96 - 1.
     error InvalidUInt96();
 
+    /// @notice Emitted if `wrap` or `unwrap` amount is 0.
+    error InvalidAmount();
+
     /* ============ Interactive Functions ============ */
 
     /**
