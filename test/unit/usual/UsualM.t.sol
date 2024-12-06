@@ -44,6 +44,8 @@ contract UsualMUnitTests is Test {
 
     UsualM internal _usualM;
 
+    event MintCapSet(uint256 newMintCap);
+
     function setUp() external {
         _wrappedM = new MockWrappedM();
         _registryAccess = new MockRegistryAccess();
