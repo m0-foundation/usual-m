@@ -10,7 +10,8 @@ import { MockWrappedM, MockRegistryAccess } from "../../utils/Mocks.sol";
 import {
     DEFAULT_ADMIN_ROLE,
     USUAL_M_UNWRAP,
-    USUAL_M_PAUSE_UNPAUSE,
+    USUAL_M_PAUSE,
+    USUAL_M_UNPAUSE,
     BLACKLIST_ROLE,
     USUAL_M_MINTCAP_ALLOCATOR
 } from "../../../src/usual/constants.sol";
@@ -23,6 +24,7 @@ contract UsualMUnitTests is Test {
 
     address internal _admin = makeAddr("admin");
     address internal _pauser = makeAddr("pauser");
+    address internal _unpauser = makeAddr("unpauser");
 
     address internal _alice = makeAddr("alice");
     address internal _bob = makeAddr("bob");
@@ -54,12 +56,13 @@ contract UsualMUnitTests is Test {
         _usualM.initialize(address(_wrappedM), address(_registryAccess));
 
         // Set pauser/unpauser role.
-        vm.prank(_admin);
-        _registryAccess.grantRole(USUAL_M_PAUSE_UNPAUSE, _pauser);
+        vm.startPrank(_admin);
+        _registryAccess.grantRole(USUAL_M_PAUSE, _pauser);
+        _registryAccess.grantRole(USUAL_M_UNPAUSE, _unpauser);
 
         // Grant BLACKLIST_ROLE to the blacklister instead of admin
-        vm.prank(_admin);
         _registryAccess.grantRole(BLACKLIST_ROLE, _blacklister);
+        vm.stopPrank();
 
         // Fund accounts with WrappedM tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
