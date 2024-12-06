@@ -265,6 +265,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         return a < b ? a : b;
     }
 
+    /// @dev Converts a uint256 to a uint96, reverting if the conversion without loss is not possible.
     function _safe96(uint256 n) internal pure returns (uint96) {
         if (n > type(uint96).max) revert InvalidUInt96();
         return uint96(n);
