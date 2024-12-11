@@ -246,9 +246,6 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     function _wrap(address account, address recipient, uint256 amount) internal returns (uint256 wrapped) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
 
-        // Check if the new total supply would exceed the mint cap.
-        if (totalSupply() + amount > $.mintCap) revert MintCapExceeded();
-
         // NOTE: The behavior of `IWrappedMLike.transferFrom` is known, so its return can be ignored.
         IWrappedMLike($.wrappedM).transferFrom(account, address(this), amount);
 
@@ -282,6 +279,9 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     ) internal virtual override(ERC20PausableUpgradeable, ERC20Upgradeable) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
         if ($.isBlacklisted[from] || $.isBlacklisted[to]) revert Blacklisted();
+
+        // Check if minting would exceed the mint cap
+        if (from == address(0) && totalSupply() + amount > $.mintCap) revert MintCapExceeded();
 
         ERC20PausableUpgradeable._update(from, to, amount);
     }
