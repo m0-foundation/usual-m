@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.26;
 
-contract MockWrappedM {
+contract MockMToken {
     mapping(address account => uint256 balance) public balanceOf;
 
     function permit(

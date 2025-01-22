@@ -35,7 +35,7 @@ interface IUsualM is IERC20Metadata {
     error ZeroAddress();
 
     /// @notice Emitted if WrappedM Token is 0x0.
-    error ZeroWrappedM();
+    error ZeroMToken();
 
     /// @notice Emitted if Registry Access is 0x0.
     error ZeroRegistryAccess();
@@ -123,8 +123,8 @@ interface IUsualM is IERC20Metadata {
     /// @notice Returns whether the account is blacklisted.
     function isBlacklisted(address account) external view returns (bool);
 
-    /// @notice Returns the WrappedM Token address.
-    function wrappedM() external view returns (address);
+    /// @notice Returns the M token address.
+    function mToken() external view returns (address);
 
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);

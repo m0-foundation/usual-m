@@ -14,7 +14,7 @@ import {
 
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { IWrappedMLike } from "./interfaces/IWrappedMLike.sol";
+import { IMTokenLike } from "./interfaces/IMTokenLike.sol";
 import { IUsualM } from "./interfaces/IUsualM.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
 
@@ -40,8 +40,12 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         address wrappedM;
         // 2nd slot
         address registryAccess;
-        // next slots
+        // 3rd slot
         mapping(address => bool) isBlacklisted;
+        // 4th slot
+        address mToken;
+        // 5th slot
+        int144 roundingError;
     }
 
     // keccak256(abi.encode(uint256(keccak256("UsualM.storage.v0")) - 1)) & ~bytes32(uint256(0xff))
@@ -71,8 +75,8 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /* ============ Initializer ============ */
 
-    function initialize(address wrappedM_, address registryAccess_) public initializer {
-        if (wrappedM_ == address(0)) revert ZeroWrappedM();
+    function initialize(address mToken_, address registryAccess_) public initializer {
+        if (mToken_ == address(0)) revert ZeroMToken();
         if (registryAccess_ == address(0)) revert ZeroRegistryAccess();
 
         __ERC20_init("UsualM", "USUALM");
@@ -80,7 +84,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         __ERC20Permit_init("UsualM");
 
         UsualMStorageV0 storage $ = _usualMStorageV0();
-        $.wrappedM = wrappedM_;
+        $.mToken = mToken_;
         $.registryAccess = registryAccess_;
     }
 
@@ -105,7 +109,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         if (amount == 0) revert InvalidAmount();
 
         // NOTE: `permit` call failures can be safely ignored to remove the risk of transactions being reverted due to front-run.
-        try IWrappedMLike(wrappedM()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
+        try IMTokenLike(mToken()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
 
         return _wrap(msg.sender, recipient, amount);
     }
@@ -203,9 +207,9 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     }
 
     /// @inheritdoc IUsualM
-    function wrappedM() public view returns (address) {
+    function mToken() public view returns (address) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
-        return $.wrappedM;
+        return $.mToken;
     }
 
     /// @inheritdoc IUsualM
@@ -246,8 +250,8 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     function _wrap(address account, address recipient, uint256 amount) internal returns (uint256 wrapped) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
 
-        // NOTE: The behavior of `IWrappedMLike.transferFrom` is known, so its return can be ignored.
-        IWrappedMLike($.wrappedM).transferFrom(account, address(this), amount);
+        // NOTE: The behavior of `IMTokenLike.transferFrom` is known, so its return can be ignored.
+        IMTokenLike($.mToken).transferFrom(account, address(this), amount);
 
         _mint(recipient, wrapped = amount);
     }
@@ -262,8 +266,8 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
         _burn(account, amount);
 
-        // NOTE: The behavior of `IWrappedMLike.transfer` is known, so its return can be ignored.
-        IWrappedMLike(wrappedM()).transfer(recipient, unwrapped = amount);
+        // NOTE: The behavior of `IMTokenLike.transfer` is known, so its return can be ignored.
+        IMTokenLike(mToken()).transfer(recipient, unwrapped = amount);
     }
 
     /**
