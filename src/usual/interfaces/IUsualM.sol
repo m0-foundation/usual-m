@@ -87,6 +87,8 @@ interface IUsualM is IERC20Metadata {
      */
     function unwrap(address recipient, uint256 amount) external returns (uint256);
 
+    /* ============ Special Admin Functions ============ */
+
     /**
      * @notice Adds an address to the blacklist.
      * @dev Can only be called by the `BLACKLIST_ROLE`.
@@ -117,6 +119,18 @@ interface IUsualM is IERC20Metadata {
      * @dev number of deciamls is 6 for the mint cap value.
      **/
     function setMintCap(uint256 newMintCap) external;
+
+    /**
+     * @notice Starts earning M on behalf of UsualM.
+     * @dev Can only be called by the `M_ENABLE_EARNING` role.
+     */
+    function startEarningM() external;
+
+    /**
+     * @notice Stops earning M on behalf of UsualM.
+     * @dev Can only be called by the `M_DISABLE_EARNING` role.
+     */
+    function stopEarningM() external;
 
     /* ============ View/Pure Functions ============ */
 

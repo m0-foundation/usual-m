@@ -13,7 +13,9 @@ import {
     USUAL_M_PAUSE,
     USUAL_M_UNPAUSE,
     BLACKLIST_ROLE,
-    USUAL_M_MINTCAP_ALLOCATOR
+    USUAL_M_MINTCAP_ALLOCATOR,
+    M_ENABLE_EARNING,
+    M_DISABLE_EARNING
 } from "../../../src/usual/constants.sol";
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
@@ -36,6 +38,9 @@ contract UsualMUnitTests is Test {
     address internal _blacklister = makeAddr("blacklister");
 
     address internal _mintCapAllocator = makeAddr("mintCapAllocator");
+
+    address internal _mEarningEnabler = makeAddr("mEarningEnabler");
+    address internal _mEarningDisabler = makeAddr("mEarningDisabler");
 
     address[] internal _accounts = [_alice, _bob, _charlie, _david];
 
@@ -74,6 +79,13 @@ contract UsualMUnitTests is Test {
             vm.prank(_admin);
             _registryAccess.grantRole(USUAL_M_UNWRAP, _accounts[i]);
         }
+
+        // Grant M_ENABLE_EARNING and M_DISABLE_EARNING roles
+        vm.prank(_admin);
+        _registryAccess.grantRole(M_ENABLE_EARNING, _mEarningEnabler);
+
+        vm.prank(_admin);
+        _registryAccess.grantRole(M_DISABLE_EARNING, _mEarningDisabler);
 
         // Add mint cap allocator role to a separate address
         vm.prank(_admin);
@@ -443,6 +455,32 @@ contract UsualMUnitTests is Test {
 
         vm.prank(_mintCapAllocator);
         _usualM.setMintCap(100e6);
+    }
+
+    /* ============ startEarningM ============ */
+    function test_startEarningM() external {
+        vm.expectCall(address(_mToken), abi.encodeCall(_mToken.startEarning, ()));
+
+        vm.prank(_mEarningEnabler);
+        _usualM.startEarningM();
+    }
+
+    function test_startEarningM_unauthorized() external {
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
+        _usualM.startEarningM();
+    }
+
+    /* ============ stopEarningM ============ */
+    function test_stopEarningM() external {
+        vm.expectCall(address(_mToken), abi.encodeCall(_mToken.stopEarning, ()));
+
+        vm.prank(_mEarningDisabler);
+        _usualM.stopEarningM();
+    }
+
+    function test_stopEarningM_unauthorized() external {
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
+        _usualM.stopEarningM();
     }
 
     /* ============ wrappable amount ============ */

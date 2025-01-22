@@ -23,7 +23,9 @@ import {
     USUAL_M_PAUSE,
     USUAL_M_UNPAUSE,
     BLACKLIST_ROLE,
-    USUAL_M_MINTCAP_ALLOCATOR
+    USUAL_M_MINTCAP_ALLOCATOR,
+    M_ENABLE_EARNING,
+    M_DISABLE_EARNING
 } from "./constants.sol";
 
 /**
@@ -197,6 +199,28 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         $.isBlacklisted[account] = false;
 
         emit UnBlacklist(account);
+    }
+
+    /// @inheritdoc IUsualM
+    /// @dev Can only be called by an account with the `M_ENABLE_EARNING` role.
+    function startEarningM() external {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+
+        // Check that caller has a valid access role before proceeding.
+        if (!IRegistryAccess($.registryAccess).hasRole(M_ENABLE_EARNING, msg.sender)) revert NotAuthorized();
+
+        IMTokenLike($.mToken).startEarning();
+    }
+
+    /// @inheritdoc IUsualM
+    /// @dev Can only be called by an account with the `M_DISABLE_EARNING` role.
+    function stopEarningM() external {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+
+        // Check that caller has a valid access role before proceeding.
+        if (!IRegistryAccess($.registryAccess).hasRole(M_DISABLE_EARNING, msg.sender)) revert NotAuthorized();
+
+        IMTokenLike($.mToken).stopEarning();
     }
 
     /* ============ External View/Pure Functions ============ */

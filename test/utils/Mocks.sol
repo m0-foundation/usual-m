@@ -32,6 +32,10 @@ contract MockMToken {
     function setBalanceOf(address account, uint256 balance) external {
         balanceOf[account] = balance;
     }
+
+    function startEarning() external {}
+
+    function stopEarning() external {}
 }
 
 contract MockRegistryAccess {
