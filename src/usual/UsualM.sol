@@ -25,7 +25,8 @@ import {
     BLACKLIST_ROLE,
     USUAL_M_MINTCAP_ALLOCATOR,
     M_ENABLE_EARNING,
-    M_DISABLE_EARNING
+    M_DISABLE_EARNING,
+    M_CLAIM_EXCESS
 } from "./constants.sol";
 
 /**
@@ -210,6 +211,8 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         if (!IRegistryAccess($.registryAccess).hasRole(M_ENABLE_EARNING, msg.sender)) revert NotAuthorized();
 
         IMTokenLike($.mToken).startEarning();
+
+        emit StartedEarningM();
     }
 
     /// @inheritdoc IUsualM
@@ -221,6 +224,28 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         if (!IRegistryAccess($.registryAccess).hasRole(M_DISABLE_EARNING, msg.sender)) revert NotAuthorized();
 
         IMTokenLike($.mToken).stopEarning();
+
+        emit StoppedEarningM();
+    }
+
+    /// @inheritdoc IUsualM
+    /// @dev Can only be called by an account with the `M_CLAIM_EXCESS` role.
+    function claimExcessM(address recipient) external returns (uint256) {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+
+        // Check that caller has a valid access role before proceeding.
+        if (!IRegistryAccess($.registryAccess).hasRole(M_CLAIM_EXCESS, msg.sender)) revert NotAuthorized();
+
+        uint256 excessM_ = excessM();
+
+        if (excessM_ == 0) return excessM_;
+
+        // NOTE: The behavior of `IMTokenLike.transfer` is known, so its return can be ignored.
+        IMTokenLike($.mToken).transfer(recipient, excessM_);
+
+        emit ClaimedExcessM(recipient, excessM_);
+
+        return excessM_;
     }
 
     /* ============ External View/Pure Functions ============ */
@@ -260,6 +285,14 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         uint256 mintCap_ = mintCap();
 
         return _min(amount, mintCap_ > totalSupply_ ? mintCap_ - totalSupply_ : 0);
+    }
+
+    /// @inheritdoc IUsualM
+    function excessM() public view returns (uint256) {
+        uint256 totalSupply_ = totalSupply();
+        uint256 mBalance_ = IMTokenLike(mToken()).balanceOf(address(this));
+
+        return mBalance_ > totalSupply_ ? mBalance_ - totalSupply_ : 0;
     }
 
     /* ============ Internal Interactive Functions ============ */

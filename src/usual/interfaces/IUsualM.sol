@@ -22,6 +22,21 @@ interface IUsualM is IERC20Metadata {
     /// @notice Emitted when mint cap is set.
     event MintCapSet(uint256 newMintCap);
 
+    /// @notice Emitted when UsualM started earning M.
+    event StartedEarningM();
+
+    /// @notice Emitted when UsualM stopped earning M.
+    event StoppedEarningM();
+
+    /**
+     * @notice Emitted when excess M from UsualM is claimed.
+     * @param  recipient The address receiving the excess M.
+     * @param  amount    The amount of M claimed.
+     */
+    event ClaimedExcessM(address indexed recipient, uint256 amount);
+
+    /* ============ Custom Errors ============ */
+
     /// @notice Emitted when token transfers/wraps are attempted by blacklisted account.
     error Blacklisted();
 
@@ -132,6 +147,15 @@ interface IUsualM is IERC20Metadata {
      */
     function stopEarningM() external;
 
+    /**
+     * @notice Claims the excess M earned by UsualM.
+     * @dev Can only be called by the `M_CLAIM_EXCESS` role.
+     * @dev Will return early if there is no excess M to claim.
+     * @param recipient The account receiving the excess M.
+     * @return The amount of M claimed.
+     */
+    function claimExcessM(address recipient) external returns (uint256);
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice Returns whether the account is blacklisted.
@@ -148,4 +172,7 @@ interface IUsualM is IERC20Metadata {
 
     /// @notice Returns the available wrappable amount for the current values of `mintCap` and `totalSupply`.
     function getWrappableAmount(uint256 amount) external view returns (uint256);
+
+    /// @notice Returns the amount of M in excess earned by UsualM.
+    function excessM() external view returns (uint256);
 }

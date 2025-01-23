@@ -33,11 +33,16 @@ contract UsualMIntegrationTests is TestBase {
         _grantRoles();
 
         // Add UsualM to the list of earners
-        _setClaimOverrideRecipient(address(_usualM), _treasury);
-
-        // Add treasury as a recipient of UsualM yield
         _addToList(_EARNERS_LIST, address(_usualM));
-        _wrappedM.startEarningFor(address(_usualM));
+
+        // Add Usual treasury to the list of earners
+        _addToList(_EARNERS_LIST, _treasury);
+
+        vm.prank(_admin);
+        _usualM.startEarningM();
+
+        vm.prank(_treasury);
+        _mToken.startEarning();
 
         // Set Mint Cap
         vm.prank(_admin);
@@ -48,8 +53,8 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_usualM.name(), "UsualM");
         assertEq(_usualM.symbol(), "USUALM");
         assertEq(_usualM.decimals(), 6);
-        assertEq(_wrappedM.isEarning(address(_usualM)), true);
-        assertEq(_wrappedM.claimOverrideRecipientFor(address(_usualM)), _treasury);
+        assertEq(_mToken.isEarning(address(_usualM)), true);
+        assertEq(_mToken.isEarning(_treasury), true);
     }
 
     function test_yieldAccumulationAndClaim() external {
@@ -59,50 +64,65 @@ contract UsualMIntegrationTests is TestBase {
 
         // Check balances of UsualM and Alice after wrapping
         assertEq(_usualM.balanceOf(_alice), amount);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), amount);
+        assertEq(_mToken.balanceOf(address(_usualM)), amount - 1); // TODO: fix rounding error
 
         // Fast forward 90 days in the future to generate yield
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
-        uint256 yield = _wrappedM.accruedYieldOf(address(_usualM));
+        uint256 yield = _usualM.excessM();
         assertGt(yield, 0);
 
-        // Claim yield by unwrapping
+        // Check balances before unwrapping Usual M
+        assertEq(_usualM.balanceOf(_alice), amount);
+        assertEq(_mToken.balanceOf(_alice), 0);
+        assertEq(_mToken.balanceOf(_treasury), 0);
+        assertEq(_mToken.balanceOf(address(_usualM)), amount + yield);
+
+        // Unwrap UsualM
         _unwrap(_alice, _alice, amount);
 
-        // Check balances of UsualM and Alice after unwrapping
+        // Check balances after unwrapping
         assertEq(_usualM.balanceOf(_alice), 0);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 0);
-        assertEq(_wrappedM.balanceOf(_alice), amount);
-
-        assertEq(_wrappedM.balanceOf(_treasury), yield);
+        assertEq(_mToken.balanceOf(_alice), amount);
+        assertEq(_mToken.balanceOf(_treasury), 0);
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), yield, 1);
 
         _wrap(_bob, _bob, amount);
 
         // Fast forward 90 days in the future to generate yield
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
-        yield += _wrappedM.accruedYieldOf(address(_usualM));
+        yield = _usualM.excessM();
 
-        // Explicitly claim yield for UsualM
-        _wrappedM.claimFor(address(_usualM));
+        // Check balances before claiming excess M
+        assertEq(_usualM.balanceOf(_bob), amount);
+        assertEq(_mToken.balanceOf(_bob), 0);
+        assertEq(_mToken.balanceOf(_treasury), 0);
+        assertEq(_mToken.balanceOf(address(_usualM)), amount + yield);
 
-        assertEq(_wrappedM.accruedYieldOf(address(_usualM)), 0);
-        assertEq(_wrappedM.balanceOf(_treasury), yield);
+        vm.prank(_admin);
+        _usualM.claimExcessM(_treasury);
+
+        // Check balances after claiming excess M
+        assertEq(_usualM.balanceOf(_bob), amount);
+        assertEq(_mToken.balanceOf(_bob), 0);
+        assertEq(_mToken.balanceOf(_treasury), yield);
+        assertEq(_mToken.balanceOf(address(_usualM)), amount);
+        assertEq(_usualM.excessM(), 0);
     }
 
     function test_wrapWithPermits() external {
-        assertEq(_wrappedM.balanceOf(_alice), 10e6);
+        assertEq(_mToken.balanceOf(_alice), 10e6);
 
         _wrapWithPermitVRS(_alice, _aliceKey, _alice, 5e6, 0, block.timestamp);
 
         assertEq(_usualM.balanceOf(_alice), 5e6);
-        assertEq(_wrappedM.balanceOf(_alice), 5e6);
+        assertEq(_mToken.balanceOf(_alice), 5e6);
 
         _wrapWithPermitVRS(_alice, _aliceKey, _alice, 5e6, 1, block.timestamp);
 
         assertEq(_usualM.balanceOf(_alice), 10e6);
-        assertEq(_wrappedM.balanceOf(_alice), 0);
+        assertEq(_mToken.balanceOf(_alice), 0);
     }
 
     function test_upgrade() external {

@@ -8,13 +8,21 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
-import { IWrappedMLike } from "../../../src/usual/interfaces/IWrappedMLike.sol";
+import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
 import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
 
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
-import { USUAL_M_UNWRAP, USUAL_M_PAUSE, USUAL_M_UNPAUSE, USUAL_M_MINTCAP_ALLOCATOR } from "../../../src/usual/constants.sol";
+import {
+    USUAL_M_UNWRAP,
+    USUAL_M_PAUSE,
+    USUAL_M_UNPAUSE,
+    USUAL_M_MINTCAP_ALLOCATOR,
+    M_ENABLE_EARNING,
+    M_DISABLE_EARNING,
+    M_CLAIM_EXCESS
+} from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
@@ -23,10 +31,10 @@ contract TestBase is Test {
     bytes32 internal constant _EARNERS_LIST = "earners";
     bytes32 internal constant _CLAIM_OVERRIDE_RECIPIENT_PREFIX = "wm_claim_override_recipient";
 
-    IWrappedMLike internal constant _wrappedM = IWrappedMLike(0x437cc33344a0B27A429f795ff6B469C72698B291);
+    IMTokenLike internal constant _mToken = IMTokenLike(0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b);
 
-    // Large WrappedM holder on Ethereum Mainnet
-    address internal constant _wrappedMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
+    // Large MToken holder on Ethereum Mainnet
+    address internal constant _mTokenSource = 0x3f0376da3Ae4313E7a5F1dA184BAFC716252d759;
 
     IRegistryAccess internal constant _registryAccess = IRegistryAccess(0x0D374775E962c3608B8F0A4b8B10567DF739bb56);
     address internal _admin = _registryAccess.defaultAdmin();
@@ -54,9 +62,9 @@ contract TestBase is Test {
         IRegistrarLike(_registrar).removeFromList(list_, account_);
     }
 
-    function _giveWrappedM(address account_, uint256 amount_) internal {
-        vm.prank(_wrappedMSource);
-        _wrappedM.transfer(account_, amount_);
+    function _giveMToken(address account_, uint256 amount_) internal {
+        vm.prank(_mTokenSource);
+        _mToken.transfer(account_, amount_);
     }
 
     function _giveEth(address account_, uint256 amount_) internal {
@@ -65,7 +73,7 @@ contract TestBase is Test {
 
     function _wrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _wrappedM.approve(address(_usualM), amount_);
+        _mToken.approve(address(_usualM), amount_);
 
         vm.prank(account_);
         _usualM.wrap(recipient_, amount_);
@@ -103,7 +111,7 @@ contract TestBase is Test {
         _usualMImplementation = address(new UsualM());
         bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
-            address(_wrappedM),
+            address(_mToken),
             _registryAccess
         );
         _usualM = IUsualM(address(new TransparentUpgradeableProxy(_usualMImplementation, _admin, usualMData)));
@@ -111,7 +119,7 @@ contract TestBase is Test {
 
     function _fundAccounts() internal {
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _giveWrappedM(_accounts[i], 10e6);
+            _giveMToken(_accounts[i], 10e6);
             _giveEth(_accounts[i], 0.1 ether);
         }
     }
@@ -129,6 +137,15 @@ contract TestBase is Test {
 
         vm.prank(_admin);
         IRegistryAccess(_registryAccess).grantRole(USUAL_M_MINTCAP_ALLOCATOR, _admin);
+
+        vm.prank(_admin);
+        IRegistryAccess(_registryAccess).grantRole(M_ENABLE_EARNING, _admin);
+
+        vm.prank(_admin);
+        IRegistryAccess(_registryAccess).grantRole(M_DISABLE_EARNING, _admin);
+
+        vm.prank(_admin);
+        IRegistryAccess(_registryAccess).grantRole(M_CLAIM_EXCESS, _admin);
     }
 
     /* ============ utils ============ */
@@ -150,10 +167,10 @@ contract TestBase is Test {
                 keccak256(
                     abi.encodePacked(
                         "\x19\x01",
-                        _wrappedM.DOMAIN_SEPARATOR(),
+                        _mToken.DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                _wrappedM.PERMIT_TYPEHASH(),
+                                _mToken.PERMIT_TYPEHASH(),
                                 account_,
                                 address(_usualM),
                                 amount_,

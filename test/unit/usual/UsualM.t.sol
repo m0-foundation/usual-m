@@ -15,7 +15,8 @@ import {
     BLACKLIST_ROLE,
     USUAL_M_MINTCAP_ALLOCATOR,
     M_ENABLE_EARNING,
-    M_DISABLE_EARNING
+    M_DISABLE_EARNING,
+    M_CLAIM_EXCESS
 } from "../../../src/usual/constants.sol";
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
@@ -41,6 +42,7 @@ contract UsualMUnitTests is Test {
 
     address internal _mEarningEnabler = makeAddr("mEarningEnabler");
     address internal _mEarningDisabler = makeAddr("mEarningDisabler");
+    address internal _mExcessClaimer = makeAddr("mClaimer");
 
     address[] internal _accounts = [_alice, _bob, _charlie, _david];
 
@@ -48,8 +50,6 @@ contract UsualMUnitTests is Test {
     MockRegistryAccess internal _registryAccess;
 
     UsualM internal _usualM;
-
-    event MintCapSet(uint256 newMintCap);
 
     function setUp() external {
         _mToken = new MockMToken();
@@ -86,6 +86,10 @@ contract UsualMUnitTests is Test {
 
         vm.prank(_admin);
         _registryAccess.grantRole(M_DISABLE_EARNING, _mEarningDisabler);
+
+        // Grant M_CLAIM_EXCESS role
+        vm.prank(_admin);
+        _registryAccess.grantRole(M_CLAIM_EXCESS, _mExcessClaimer);
 
         // Add mint cap allocator role to a separate address
         vm.prank(_admin);
@@ -451,7 +455,7 @@ contract UsualMUnitTests is Test {
 
     function test_setMintCap_emitsEvent() external {
         vm.expectEmit(false, false, false, true);
-        emit MintCapSet(100e6);
+        emit IUsualM.MintCapSet(100e6);
 
         vm.prank(_mintCapAllocator);
         _usualM.setMintCap(100e6);
@@ -460,6 +464,9 @@ contract UsualMUnitTests is Test {
     /* ============ startEarningM ============ */
     function test_startEarningM() external {
         vm.expectCall(address(_mToken), abi.encodeCall(_mToken.startEarning, ()));
+
+        vm.expectEmit();
+        emit IUsualM.StartedEarningM();
 
         vm.prank(_mEarningEnabler);
         _usualM.startEarningM();
@@ -473,6 +480,9 @@ contract UsualMUnitTests is Test {
     /* ============ stopEarningM ============ */
     function test_stopEarningM() external {
         vm.expectCall(address(_mToken), abi.encodeCall(_mToken.stopEarning, ()));
+
+        vm.expectEmit();
+        emit IUsualM.StoppedEarningM();
 
         vm.prank(_mEarningDisabler);
         _usualM.stopEarningM();
@@ -500,6 +510,79 @@ contract UsualMUnitTests is Test {
 
         // Check wrappable amount with amount less than difference between mint cap and total supply
         assertEq(_usualM.getWrappableAmount(20e6), 20e6);
+    }
+
+    /* ============ excess ============ */
+    function test_excessM() external {
+        uint256 amount_ = 100e6;
+        uint256 yield_ = 10e6;
+
+        // Fund alice account with 100 M tokens
+        _mToken.setBalanceOf(_alice, amount_);
+
+        // Wrap some tokens
+        vm.prank(_alice);
+        _usualM.wrap(_alice, amount_);
+
+        // Simulate yield accumulation
+        _mToken.setBalanceOf(address(_usualM), amount_ + yield_);
+
+        // Check excess
+        assertEq(_usualM.excessM(), yield_);
+    }
+
+    function test_excessM_noYield() external {
+        uint256 amount_ = 100e6;
+
+        _mToken.setBalanceOf(_alice, amount_);
+
+        // Wrap some tokens
+        vm.prank(_alice);
+        _usualM.wrap(_alice, amount_);
+
+        // No yield has accumulated yet
+        _mToken.setBalanceOf(address(_usualM), amount_);
+
+        // Check excess
+        assertEq(_usualM.excessM(), 0);
+    }
+
+    /* ============ claimExcessM ============ */
+    function test_claimExcessM() external {
+        uint256 amount_ = 100e6;
+        uint256 yield_ = 10e6;
+
+        // Fund alice account with 100 M tokens
+        _mToken.setBalanceOf(_alice, amount_);
+
+        // Wrap some tokens
+        vm.prank(_alice);
+        _usualM.wrap(_alice, amount_);
+
+        // Simulate yield accumulation
+        _mToken.setBalanceOf(address(_usualM), amount_ + yield_);
+
+        assertEq(_mToken.balanceOf(_treasury), 0);
+
+        vm.expectEmit();
+        emit IUsualM.ClaimedExcessM(_treasury, yield_);
+
+        vm.prank(_mExcessClaimer);
+
+        assertEq(_usualM.claimExcessM(_treasury), yield_);
+        assertEq(_mToken.balanceOf(_treasury), yield_);
+    }
+
+    function test_claimExcessM_unauthorized() external {
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
+        _usualM.claimExcessM(_treasury);
+    }
+
+    function test_claimExcessM_noYield() external {
+        vm.prank(_mExcessClaimer);
+
+        assertEq(_usualM.claimExcessM(_treasury), 0);
+        assertEq(_mToken.balanceOf(_treasury), 0);
     }
 
     /* ============ utils ============ */
