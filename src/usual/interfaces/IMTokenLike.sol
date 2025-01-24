@@ -63,12 +63,6 @@ interface IMTokenLike {
 
     /* ============ View/Pure Functions ============ */
 
-    /// @notice Returns the EIP712 domain separator used in the encoding of a signed digest.
-    function DOMAIN_SEPARATOR() external view returns (bytes32);
-
-    /// @notice Returns the EIP712 typehash used in the encoding of the digest for the permit function.
-    function PERMIT_TYPEHASH() external view returns (bytes32);
-
     /**
      * @notice Checks if account is an earner.
      * @param  account The account to check.
@@ -85,6 +79,19 @@ interface IMTokenLike {
 
     /// @notice The current index that would be written to storage if `updateIndex` is called.
     function currentIndex() external view returns (uint128 currentIndex);
+
+    /**
+     * @notice The principal of an earner M token balance.
+     * @param  account   The account to get the principal balance of.
+     * @return principal The principal balance of the account.
+     */
+    function principalBalanceOf(address account) external view returns (uint240 principal);
+
+    /// @notice Returns the EIP712 domain separator used in the encoding of a signed digest.
+    function DOMAIN_SEPARATOR() external view returns (bytes32);
+
+    /// @notice Returns the EIP712 typehash used in the encoding of the digest for the permit function.
+    function PERMIT_TYPEHASH() external view returns (bytes32);
 
     /// @notice The address of the TTG Registrar contract.
     function ttgRegistrar() external view returns (address ttgRegistrar);

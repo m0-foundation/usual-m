@@ -64,7 +64,7 @@ contract UsualMIntegrationTests is TestBase {
 
         // Check balances of UsualM and Alice after wrapping
         assertEq(_usualM.balanceOf(_alice), amount);
-        assertEq(_mToken.balanceOf(address(_usualM)), amount - 1); // TODO: fix rounding error
+        assertEq(_mToken.balanceOf(address(_usualM)), amount - 1); // M token rounds down for an earner
 
         // Fast forward 90 days in the future to generate yield
         vm.warp(vm.getBlockTimestamp() + 90 days);
@@ -76,7 +76,7 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_usualM.balanceOf(_alice), amount);
         assertEq(_mToken.balanceOf(_alice), 0);
         assertEq(_mToken.balanceOf(_treasury), 0);
-        assertEq(_mToken.balanceOf(address(_usualM)), amount + yield);
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), amount + yield, 1); // excessM rounds down
 
         // Unwrap UsualM
         _unwrap(_alice, _alice, amount);
@@ -98,7 +98,7 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_usualM.balanceOf(_bob), amount);
         assertEq(_mToken.balanceOf(_bob), 0);
         assertEq(_mToken.balanceOf(_treasury), 0);
-        assertEq(_mToken.balanceOf(address(_usualM)), amount + yield);
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), amount + yield, 2);
 
         vm.prank(_admin);
         _usualM.claimExcessM(_treasury);
@@ -107,7 +107,7 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_usualM.balanceOf(_bob), amount);
         assertEq(_mToken.balanceOf(_bob), 0);
         assertEq(_mToken.balanceOf(_treasury), yield);
-        assertEq(_mToken.balanceOf(address(_usualM)), amount);
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), amount, 1); // excessM rounds down and a 1 wei buffer is left after claiming excess
         assertEq(_usualM.excessM(), 0);
     }
 

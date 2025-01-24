@@ -5,6 +5,8 @@ pragma solidity 0.8.26;
 contract MockMToken {
     mapping(address account => uint256 balance) public balanceOf;
 
+    uint256 public currentIndex;
+
     function permit(
         address owner,
         address spender,
@@ -31,6 +33,10 @@ contract MockMToken {
 
     function setBalanceOf(address account, uint256 balance) external {
         balanceOf[account] = balance;
+    }
+
+    function setCurrentIndex(uint256 index) external {
+        currentIndex = index;
     }
 
     function startEarning() external {}

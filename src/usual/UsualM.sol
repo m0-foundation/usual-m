@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.26;
 
+import { IndexingMath } from "../../lib/common/src/libs/IndexingMath.sol";
+import { UIntMath } from "../../lib/common/src/libs/UIntMath.sol";
+
 import {
     ERC20PausableUpgradeable
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
@@ -289,10 +292,12 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /// @inheritdoc IUsualM
     function excessM() public view returns (uint256) {
+        address mToken_ = mToken();
         uint256 totalSupply_ = totalSupply();
-        uint256 mBalance_ = IMTokenLike(mToken()).balanceOf(address(this));
+        uint256 mBalance_ = IMTokenLike(mToken_).balanceOf(address(this));
 
-        return mBalance_ > totalSupply_ ? mBalance_ - totalSupply_ : 0;
+        return
+            mBalance_ > totalSupply_ ? _getSafeTransferableM(mToken_, UIntMath.safe240(mBalance_ - totalSupply_)) : 0;
     }
 
     /* ============ Internal Interactive Functions ============ */
@@ -323,8 +328,11 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
         _burn(account, amount);
 
+        address mToken_ = mToken();
+        unwrapped = _getSufficientTransferableM(mToken_, recipient, UIntMath.safe240(amount));
+
         // NOTE: The behavior of `IMTokenLike.transfer` is known, so its return can be ignored.
-        IMTokenLike(mToken()).transfer(recipient, unwrapped = amount);
+        IMTokenLike(mToken_).transfer(recipient, unwrapped);
     }
 
     /**
@@ -345,6 +353,66 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         if (from == address(0) && totalSupply() + amount > $.mintCap) revert MintCapExceeded();
 
         ERC20PausableUpgradeable._update(from, to, amount);
+    }
+
+    /* ============ Internal View Functions ============ */
+    /**
+     * @dev    Returns whether `account` is earning M token or not.
+     * @param  mToken_ The address of the M token.
+     * @param  account The account being queried.
+     * @return Whether the account is earning M token or not.
+     */
+    function _isEarningM(address mToken_, address account) internal view returns (bool) {
+        return IMTokenLike(mToken_).isEarning(account);
+    }
+
+    /**
+     * @dev    Compute the adjusted amount of M that can safely be transferred out given the current index.
+     * @param  mToken_      The address of the M token.
+     * @param  amount       Some amount to be transferred out of this contract.
+     * @return The adjusted amount that can safely be transferred out.
+     */
+    function _getSafeTransferableM(address mToken_, uint240 amount) internal view returns (uint240) {
+        uint128 currentMIndex = IMTokenLike(mToken_).currentIndex();
+
+        // If this contract is earning, adjust `amount_` to ensure it's M balance decrement is limited to `amount_`.
+        return
+            _isEarningM(mToken_, address(this))
+                ? IndexingMath.getPresentAmountRoundedDown(
+                    IndexingMath.getPrincipalAmountRoundedDown(amount, currentMIndex),
+                    currentMIndex
+                )
+                : amount;
+    }
+
+    /**
+     * @dev    Compute the adjusted amount of M that must be transferred so the recipient receives at least that amount.
+     * @param  mToken_   The address of the M token.
+     * @param  recipient The address of some recipient.
+     * @param  amount    Some amount to be transferred out of UsualM.
+     * @return The adjusted amount that must be transferred.
+     */
+    function _getSufficientTransferableM(
+        address mToken_,
+        address recipient,
+        uint240 amount
+    ) internal view returns (uint240) {
+        // If the recipient is not earning or if the wrapper is earning, no need to adjust `amount`.
+        // See: https://github.com/m0-foundation/protocol/blob/main/src/MToken.sol#L385
+        if (!_isEarningM(mToken_, recipient) || _isEarningM(mToken_, address(this))) return amount;
+
+        uint128 currentMIndex = IMTokenLike(mToken_).currentIndex();
+        uint112 principal = uint112(IMTokenLike(mToken_).principalBalanceOf(recipient));
+        uint240 balance = IndexingMath.getPresentAmountRoundedDown(principal, currentMIndex);
+
+        // Adjust `amount` to ensure the recipient's M balance increments by at least `amount`.
+        unchecked {
+            return
+                IndexingMath.getPresentAmountRoundedUp(
+                    IndexingMath.getPrincipalAmountRoundedUp(balance + amount, currentMIndex) - principal,
+                    currentMIndex
+                );
+        }
     }
 
     /// @dev Compares two uint256 values and returns the lesser one.

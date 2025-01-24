@@ -21,8 +21,12 @@ import {
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
+import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 
 contract UsualMUnitTests is Test {
+    /// @notice The scaling of rates in for exponent math.
+    uint56 internal constant EXP_SCALED_ONE = 1e12;
+
     address internal _treasury = makeAddr("treasury");
 
     address internal _admin = makeAddr("admin");
@@ -54,6 +58,9 @@ contract UsualMUnitTests is Test {
     function setUp() external {
         _mToken = new MockMToken();
         _registryAccess = new MockRegistryAccess();
+
+        // Set initial index
+        _mToken.setCurrentIndex(EXP_SCALED_ONE);
 
         // Set default admin role.
         _registryAccess.grantRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -209,6 +216,38 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, _alice),
+            abi.encode(false)
+        );
+
+        vm.prank(_alice);
+        _usualM.unwrap(_alice, 5e6);
+
+        assertEq(_mToken.balanceOf(_alice), 5e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+
+        assertEq(_usualM.balanceOf(_alice), 5e6);
+    }
+
+    function test_unwrap_usualMNotEarning() external {
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 10e6);
+
+        vm.mockCall(address(_mToken), abi.encodeWithSelector(IMTokenLike.isEarning.selector, _alice), abi.encode(true));
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, address(_usualM)),
+            abi.encode(false)
+        );
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.principalBalanceOf.selector, _alice),
+            abi.encode(0)
+        );
+
         vm.prank(_alice);
         _usualM.unwrap(_alice, 5e6);
 
@@ -225,6 +264,12 @@ contract UsualMUnitTests is Test {
         assertEq(_mToken.balanceOf(_alice), 0);
         assertEq(_mToken.balanceOf(address(_usualM)), 10e6);
         assertEq(_usualM.balanceOf(_alice), 10e6);
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, _alice),
+            abi.encode(false)
+        );
 
         vm.prank(_alice);
         _usualM.unwrap(_alice, 10e6);
@@ -527,6 +572,12 @@ contract UsualMUnitTests is Test {
         // Simulate yield accumulation
         _mToken.setBalanceOf(address(_usualM), amount_ + yield_);
 
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, address(_usualM)),
+            abi.encode(true)
+        );
+
         // Check excess
         assertEq(_usualM.excessM(), yield_);
     }
@@ -564,10 +615,16 @@ contract UsualMUnitTests is Test {
 
         assertEq(_mToken.balanceOf(_treasury), 0);
 
+        vm.prank(_mExcessClaimer);
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, address(_usualM)),
+            abi.encode(true)
+        );
+
         vm.expectEmit();
         emit IUsualM.ClaimedExcessM(_treasury, yield_);
-
-        vm.prank(_mExcessClaimer);
 
         assertEq(_usualM.claimExcessM(_treasury), yield_);
         assertEq(_mToken.balanceOf(_treasury), yield_);
