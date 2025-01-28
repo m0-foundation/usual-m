@@ -24,7 +24,6 @@ import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
 import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 
 contract UsualMUnitTests is Test {
-    /// @notice The scaling of rates in for exponent math.
     uint56 internal constant EXP_SCALED_ONE = 1e12;
 
     address internal _treasury = makeAddr("treasury");

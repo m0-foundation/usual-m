@@ -12,7 +12,9 @@ import { ERC1967Utils } from "../../../lib/openzeppelin-contracts/contracts/prox
 
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
-import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
+import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
+
+import { IERC20Like } from "../../utils/IERC20Like.sol";
 
 import { TestBase } from "./TestBase.sol";
 
@@ -48,8 +50,7 @@ contract UsualMIntegrationTests is TestBase {
         _startEarningM(_earner);
 
         // Set Mint Cap
-        vm.prank(_admin);
-        _usualM.setMintCap(10_000e6);
+        _setMintCap(10_000e6);
     }
 
     /* ============ constants ============ */
@@ -172,6 +173,61 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_mToken.balanceOf(_alice), 0);
     }
 
+    function testFuzz_wrap(
+        bool senderEarning_,
+        bool recipientEarning_,
+        uint256 wrapAmount_,
+        uint128 currentMIndex_
+    ) external {
+        currentMIndex_ = uint128(bound(currentMIndex_, EXP_SCALED_ONE, 10 * EXP_SCALED_ONE));
+        _mockCurrentMIndex(currentMIndex_);
+
+        wrapAmount_ = bound(wrapAmount_, 0, _mToken.balanceOf(_mTokenSource));
+
+        // Only set mint cap if wrap amount is different from current cap
+        if (wrapAmount_ != _usualM.mintCap()) {
+            _setMintCap(wrapAmount_);
+        }
+
+        address sender_ = senderEarning_ ? _earner : _nonEarner;
+        address recipient_ = recipientEarning_ ? _earner : _nonEarner;
+
+        _giveMToken(sender_, wrapAmount_);
+
+        uint256 senderMTokenBalanceBefore_ = _mToken.balanceOf(sender_);
+        uint256 usualMMTokenBalanceBefore_ = _mToken.balanceOf(address(_usualM));
+        uint256 recipientUsualMBalanceBefore_ = _usualM.balanceOf(recipient_);
+
+        vm.prank(sender_);
+        _mToken.approve(address(_usualM), wrapAmount_);
+
+        if (wrapAmount_ == 0) {
+            vm.expectRevert(abi.encodeWithSelector(IUsualM.InvalidAmount.selector));
+        } else {
+            vm.expectEmit();
+
+            // UsualM tranfer/mint event
+            emit IERC20Like.Transfer(address(0), recipient_, wrapAmount_);
+        }
+
+        vm.prank(sender_);
+        _usualM.wrap(recipient_, wrapAmount_);
+
+        if (wrapAmount_ == 0) return;
+
+        if (senderEarning_) {
+            assertApproxEqAbs(_mToken.balanceOf(sender_), senderMTokenBalanceBefore_ - wrapAmount_, 1); // May round down in favor of the protocol
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 1); // May round up in favor of UsualM
+
+            assertEq(_usualM.balanceOf(recipient_), recipientUsualMBalanceBefore_ + wrapAmount_);
+        } else {
+            assertEq(_mToken.balanceOf(sender_), senderMTokenBalanceBefore_ - wrapAmount_);
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 2); // May round down in favor of the protocol
+
+            assertEq(_usualM.balanceOf(recipient_), recipientUsualMBalanceBefore_ + wrapAmount_);
+        }
+    }
+
     /* ============ unwrap ============ */
     function test_unwrap_fromEarnerToEarner() external {
         _wrap(_earner, _earner, 5e6);
@@ -197,7 +253,7 @@ contract UsualMIntegrationTests is TestBase {
 
         _unwrap(_earner, _nonEarner, 5e6);
 
-        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2);
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
         assertEq(_mToken.balanceOf(_nonEarner), 15e6);
         assertEq(_mToken.balanceOf(address(_usualM)), 0);
 
@@ -260,6 +316,61 @@ contract UsualMIntegrationTests is TestBase {
         // Reverts with IMToken.InsufficientBalance due to lack of excess M
         vm.expectRevert();
         _unwrap(_nonEarner, _earner, 5e6);
+    }
+
+    function testFuzz_unwrap(
+        bool senderEarning_,
+        bool recipientEarning_,
+        uint256 wrapAmount_,
+        uint256 unwrapAmount_,
+        uint128 currentMIndex_
+    ) external {
+        currentMIndex_ = uint128(bound(currentMIndex_, EXP_SCALED_ONE, 10 * EXP_SCALED_ONE));
+        _mockCurrentMIndex(currentMIndex_);
+
+        wrapAmount_ = bound(wrapAmount_, 0, _mToken.balanceOf(_mTokenSource));
+        if (wrapAmount_ == 0) return;
+
+        _setMintCap(wrapAmount_);
+
+        unwrapAmount_ = bound(unwrapAmount_, 0, wrapAmount_);
+
+        address sender_ = senderEarning_ ? _earner : _nonEarner;
+        address recipient_ = recipientEarning_ ? _earner : _nonEarner;
+
+        _giveMToken(sender_, wrapAmount_);
+        _wrap(sender_, sender_, wrapAmount_);
+
+        uint256 senderUsualMBalanceBefore_ = _usualM.balanceOf(sender_);
+        uint256 usualMMTokenBalanceBefore_ = _mToken.balanceOf(address(_usualM));
+        uint256 recipientMTokenBalanceBefore_ = _mToken.balanceOf(recipient_);
+
+        if (unwrapAmount_ == 0) {
+            vm.expectRevert(abi.encodeWithSelector(IUsualM.InvalidAmount.selector));
+        } else if (unwrapAmount_ > usualMMTokenBalanceBefore_) {
+            // Reverts with IMToken.InsufficientBalance due to lack of excess M
+            vm.expectRevert();
+        } else {
+            vm.expectEmit(address(_usualM));
+            emit IERC20Like.Transfer(address(sender_), address(0), unwrapAmount_); // UsualM burn event
+
+            vm.expectEmit(address(_mToken));
+            emit IERC20Like.Transfer(address(_usualM), recipient_, unwrapAmount_); // M token transfer event
+        }
+
+        _unwrap(sender_, recipient_, unwrapAmount_);
+
+        if (unwrapAmount_ == 0 || unwrapAmount_ > usualMMTokenBalanceBefore_) return;
+
+        if (recipientEarning_) {
+            assertApproxEqAbs(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_, 1); // May round up in favor of the recipient
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 2); // May round down in favor of the protocol
+        } else {
+            assertApproxEqAbs(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_, 1); // May round up in favor of the recipient
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 2); // May round down in favor of the protocol
+        }
+
+        assertEq(_usualM.balanceOf(sender_), senderUsualMBalanceBefore_ - unwrapAmount_);
     }
 
     /* ============ upgrade ============ */

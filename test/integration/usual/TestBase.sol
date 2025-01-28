@@ -25,6 +25,8 @@ import {
 } from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
+    uint56 internal constant EXP_SCALED_ONE = 1e12;
+
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
     address internal constant _registrar = 0x119FbeeDD4F4f4298Fb59B720d5654442b81ae2c;
 
@@ -115,6 +117,11 @@ contract TestBase is Test {
         _set(keccak256(abi.encode(_CLAIM_OVERRIDE_RECIPIENT_PREFIX, account_)), bytes32(uint256(uint160(recipient_))));
     }
 
+    function _setMintCap(uint256 newMintCap_) internal {
+        vm.prank(_admin);
+        _usualM.setMintCap(newMintCap_);
+    }
+
     function _deployComponents() internal {
         _usualMImplementation = address(new UsualM());
         bytes memory usualMData = abi.encodeWithSignature(
@@ -154,6 +161,12 @@ contract TestBase is Test {
 
         vm.prank(_admin);
         IRegistryAccess(_registryAccess).grantRole(M_CLAIM_EXCESS, _admin);
+    }
+
+    /* ============ mock calls ============ */
+
+    function _mockCurrentMIndex(uint128 mIndex_) internal {
+        vm.mockCall(address(_mToken), abi.encodeWithSelector(IMTokenLike.currentIndex.selector), abi.encode(mIndex_));
     }
 
     /* ============ utils ============ */
