@@ -45,9 +45,12 @@ contract TestBase is Test {
     address internal _bob = makeAddr("bob");
     address internal _carol = makeAddr("carol");
 
+    address internal _earner = makeAddr("earner");
+    address internal _nonEarner = makeAddr("nonEarner");
+
     uint256 internal _aliceKey = _makeKey("alice");
 
-    address[] internal _accounts = [_alice, _bob, _carol];
+    address[] internal _accounts = [_alice, _bob, _carol, _earner, _nonEarner];
 
     address internal _usualMImplementation;
     IUsualM internal _usualM;
@@ -69,6 +72,11 @@ contract TestBase is Test {
 
     function _giveEth(address account_, uint256 amount_) internal {
         vm.deal(account_, amount_);
+    }
+
+    function _startEarningM(address account_) internal {
+        vm.prank(account_);
+        _mToken.startEarning();
     }
 
     function _wrap(address account_, address recipient_, uint256 amount_) internal {

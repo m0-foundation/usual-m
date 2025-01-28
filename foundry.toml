@@ -8,6 +8,8 @@ solc_version = "0.8.26"
 verbosity = 3
 rpc_storage_caching = { chains = ["mainnet"], endpoints = "all" }
 evm_version = "cancun"
+block_number = 21_719_303
+block_timestamp = 1_738_022_399
 
 [profile.production]
 build_info = true

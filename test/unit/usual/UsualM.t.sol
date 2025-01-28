@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
+import { Test } from "../../../lib/forge-std/src/Test.sol";
 import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
 import { MockMToken, MockRegistryAccess } from "../../utils/Mocks.sol";
@@ -280,7 +280,7 @@ contract UsualMUnitTests is Test {
         assertEq(_usualM.balanceOf(_alice), 0);
     }
 
-    function test_unwarp_notAllowed() external {
+    function test_unwrap_notAllowed() external {
         vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);

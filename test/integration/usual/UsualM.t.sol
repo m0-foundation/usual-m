@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.26;
 
-import { console2 } from "../../../lib/forge-std/src/Test.sol";
 import { Vm } from "../../../lib/forge-std/src/Vm.sol";
 
 import { ProxyAdmin } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
@@ -12,6 +11,8 @@ import {
 import { ERC1967Utils } from "../../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
 import { UsualM } from "../../../src/usual/UsualM.sol";
+
+import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 
 import { TestBase } from "./TestBase.sol";
 
@@ -32,22 +33,26 @@ contract UsualMIntegrationTests is TestBase {
         _fundAccounts();
         _grantRoles();
 
-        // Add UsualM to the list of earners
+        // Add UsualM to the list of earners and start earning M
         _addToList(_EARNERS_LIST, address(_usualM));
-
-        // Add Usual treasury to the list of earners
-        _addToList(_EARNERS_LIST, _treasury);
 
         vm.prank(_admin);
         _usualM.startEarningM();
 
-        vm.prank(_treasury);
-        _mToken.startEarning();
+        // Add Usual treasury to the list of earners and start earning M
+        _addToList(_EARNERS_LIST, _treasury);
+        _startEarningM(_treasury);
+
+        // Add earner account to earners list and start earning M
+        _addToList(_EARNERS_LIST, _earner);
+        _startEarningM(_earner);
 
         // Set Mint Cap
         vm.prank(_admin);
         _usualM.setMintCap(10_000e6);
     }
+
+    /* ============ constants ============ */
 
     function test_integration_constants() external view {
         assertEq(_usualM.name(), "UsualM");
@@ -56,6 +61,8 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_mToken.isEarning(address(_usualM)), true);
         assertEq(_mToken.isEarning(_treasury), true);
     }
+
+    /* ============ yield ============ */
 
     function test_yieldAccumulationAndClaim() external {
         uint256 amount = 10e6;
@@ -111,6 +118,46 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_usualM.excessM(), 0);
     }
 
+    /* ============ wrap ============ */
+
+    function test_wrap_fromEarnerToEarner() external {
+        _wrap(_earner, _earner, 5e6);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+
+        assertEq(_usualM.balanceOf(_earner), 5e6);
+    }
+
+    function test_wrap_fromEarnerToNonEarner() external {
+        _wrap(_earner, _nonEarner, 5e6);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+
+        assertEq(_usualM.balanceOf(_earner), 0);
+        assertEq(_usualM.balanceOf(_nonEarner), 5e6);
+    }
+
+    function test_wrap_fromNonEarnerToNonEarner() external {
+        _wrap(_nonEarner, _nonEarner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 5e6);
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), 5e6, 1); // May round down in favor of the protocol
+
+        assertEq(_usualM.balanceOf(_nonEarner), 5e6);
+    }
+
+    function test_wrap_fromNonEarnerToEarner() external {
+        _wrap(_nonEarner, _earner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 5e6);
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), 5e6, 1); // May round down in favor of the protocol
+
+        assertEq(_usualM.balanceOf(_nonEarner), 0);
+        assertEq(_usualM.balanceOf(_earner), 5e6);
+    }
+
     function test_wrapWithPermits() external {
         assertEq(_mToken.balanceOf(_alice), 10e6);
 
@@ -124,6 +171,98 @@ contract UsualMIntegrationTests is TestBase {
         assertEq(_usualM.balanceOf(_alice), 10e6);
         assertEq(_mToken.balanceOf(_alice), 0);
     }
+
+    /* ============ unwrap ============ */
+    function test_unwrap_fromEarnerToEarner() external {
+        _wrap(_earner, _earner, 5e6);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
+        assertEq(_usualM.balanceOf(_earner), 5e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+
+        _unwrap(_earner, _earner, 5e6);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 10e6, 2); // May round down in favor of the protocol
+        assertEq(_mToken.balanceOf(address(_usualM)), 0);
+
+        assertEq(_usualM.balanceOf(_earner), 0);
+    }
+
+    function test_unwrap_fromEarnerToNonEarner() external {
+        _wrap(_earner, _earner, 5e6);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
+        assertEq(_usualM.balanceOf(_earner), 5e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+
+        _unwrap(_earner, _nonEarner, 5e6);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2);
+        assertEq(_mToken.balanceOf(_nonEarner), 15e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 0);
+
+        assertEq(_usualM.balanceOf(_earner), 0);
+    }
+
+    function test_unwrap_fromNonEarnerToNonEarner() external {
+        _wrap(_nonEarner, _nonEarner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 5e6);
+        assertEq(_usualM.balanceOf(_nonEarner), 5e6);
+
+        // Add some excess M
+        _wrap(_alice, _alice, 1e6);
+
+        _unwrap(_nonEarner, _nonEarner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 10e6);
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), 1e6, 2); // May round down in favor of the protocol
+
+        assertEq(_usualM.balanceOf(_nonEarner), 0);
+    }
+
+    function test_unwrap_fromNonEarnerToNonEarner_noExcess() external {
+        _wrap(_nonEarner, _nonEarner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 5e6);
+        assertEq(_usualM.balanceOf(_nonEarner), 5e6);
+
+        // Reverts with IMToken.InsufficientBalance due to lack of excess M
+        vm.expectRevert();
+        _unwrap(_nonEarner, _nonEarner, 5e6);
+    }
+
+    function test_unwrap_fromNonEarnerToEarner() external {
+        _wrap(_nonEarner, _nonEarner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 5e6);
+        assertEq(_usualM.balanceOf(_nonEarner), 5e6);
+
+        // Add some excess M
+        _wrap(_alice, _alice, 1e6);
+
+        _unwrap(_nonEarner, _earner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 5e6);
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 15e6, 2); // May round down in favor of the protocol
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), 1e6, 3); // May round down in favor of the protocol
+
+        assertEq(_usualM.balanceOf(_nonEarner), 0);
+        assertEq(_usualM.balanceOf(_earner), 0);
+    }
+
+    function test_unwrap_fromNonEarnerToEarner_noExcess() external {
+        _wrap(_nonEarner, _nonEarner, 5e6);
+
+        assertEq(_mToken.balanceOf(_nonEarner), 5e6);
+        assertEq(_usualM.balanceOf(_nonEarner), 5e6);
+
+        // Reverts with IMToken.InsufficientBalance due to lack of excess M
+        vm.expectRevert();
+        _unwrap(_nonEarner, _earner, 5e6);
+    }
+
+    /* ============ upgrade ============ */
 
     function test_upgrade() external {
         address usualMV2 = address(new UsualMV2());
