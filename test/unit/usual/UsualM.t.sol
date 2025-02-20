@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 
 import { Test } from "../../../lib/forge-std/src/Test.sol";
 import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import { IndexingMath } from "../../../lib/common/src/libs/IndexingMath.sol";
 
 import { MockMToken, MockRegistryAccess } from "../../utils/Mocks.sol";
 
@@ -80,10 +81,13 @@ contract UsualMUnitTests is Test {
 
         // Fund accounts with M tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _mToken.setBalanceOf(_accounts[i], 10e6);
+            address account_ = _accounts[i];
+
+            _mToken.setBalanceOf(account_, 10e6);
+            _mToken.setIsEarning(account_, false);
 
             vm.prank(_admin);
-            _registryAccess.grantRole(USUAL_M_UNWRAP, _accounts[i]);
+            _registryAccess.grantRole(USUAL_M_UNWRAP, account_);
         }
 
         // Grant M_ENABLE_EARNING and M_DISABLE_EARNING roles
@@ -559,7 +563,7 @@ contract UsualMUnitTests is Test {
     /* ============ excess ============ */
     function test_excessM() external {
         uint256 amount_ = 100e6;
-        uint256 yield_ = 10e6;
+        uint240 yield_ = 10e6;
 
         // Fund alice account with 100 M tokens
         _mToken.setBalanceOf(_alice, amount_);
@@ -570,15 +574,10 @@ contract UsualMUnitTests is Test {
 
         // Simulate yield accumulation
         _mToken.setBalanceOf(address(_usualM), amount_ + yield_);
-
-        vm.mockCall(
-            address(_mToken),
-            abi.encodeWithSelector(IMTokenLike.isEarning.selector, address(_usualM)),
-            abi.encode(true)
-        );
+        _mToken.setIsEarning(address(_usualM), true);
 
         // Check excess
-        assertEq(_usualM.excessM(), yield_);
+        assertEq(uint240(int240(_usualM.excessM())), yield_);
     }
 
     function test_excessM_noYield() external {
@@ -597,10 +596,48 @@ contract UsualMUnitTests is Test {
         assertEq(_usualM.excessM(), 0);
     }
 
+    function testFuzz_excessM(uint128 currentMIndex_, uint256 wrapAmount_) external {
+        _mToken.setCurrentIndex(EXP_SCALED_ONE);
+
+        uint256 maxAmount_ = type(uint96).max;
+
+        vm.prank(_mintCapAllocator);
+        _usualM.setMintCap(maxAmount_);
+
+        wrapAmount_ = bound(wrapAmount_, 0, maxAmount_);
+        if (wrapAmount_ == 0) return;
+
+        _mToken.setBalanceOf(_alice, wrapAmount_);
+
+        vm.prank(_alice);
+        wrapAmount_ = _usualM.wrap(_alice, wrapAmount_);
+
+        _mToken.setIsEarning(address(_usualM), true);
+
+        uint256 mTokenBalanceBefore_ = _mToken.balanceOf(address(_usualM));
+        uint112 mTokenPrincipalBalance_ = IndexingMath.getPrincipalAmountRoundedUp(
+            uint240(mTokenBalanceBefore_),
+            EXP_SCALED_ONE
+        );
+
+        // Simulate yield accumulation
+        currentMIndex_ = uint128(bound(currentMIndex_, EXP_SCALED_ONE, 10 * EXP_SCALED_ONE));
+        _mToken.setCurrentIndex(currentMIndex_);
+
+        _mToken.setBalanceOf(
+            address(_usualM),
+            IndexingMath.getPresentAmountRoundedDown(mTokenPrincipalBalance_, currentMIndex_)
+        );
+
+        uint240 yield_ = uint240(_mToken.balanceOf(address(_usualM)) - mTokenBalanceBefore_);
+
+        assertEq(_usualM.excessM(), int248(uint248(yield_)));
+    }
+
     /* ============ claimExcessM ============ */
     function test_claimExcessM() external {
         uint256 amount_ = 100e6;
-        uint256 yield_ = 10e6;
+        uint240 yield_ = 10e6;
 
         // Fund alice account with 100 M tokens
         _mToken.setBalanceOf(_alice, amount_);
@@ -615,6 +652,12 @@ contract UsualMUnitTests is Test {
         assertEq(_mToken.balanceOf(_treasury), 0);
 
         vm.prank(_mExcessClaimer);
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.principalBalanceOf.selector, address(_usualM)),
+            abi.encode(IndexingMath.getPrincipalAmountRoundedUp(uint240(amount_ + yield_), EXP_SCALED_ONE))
+        );
 
         vm.mockCall(
             address(_mToken),
@@ -635,6 +678,7 @@ contract UsualMUnitTests is Test {
     }
 
     function test_claimExcessM_noYield() external {
+        vm.expectRevert(IUsualM.NoExcessM.selector);
         vm.prank(_mExcessClaimer);
 
         assertEq(_usualM.claimExcessM(_treasury), 0);
@@ -642,6 +686,7 @@ contract UsualMUnitTests is Test {
     }
 
     /* ============ utils ============ */
+
     function _resetInitializerImplementation(address implementation) internal {
         // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1)) & ~bytes32(uint256(0xff))
         bytes32 INITIALIZABLE_STORAGE = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;
