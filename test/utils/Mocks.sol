@@ -2,8 +2,12 @@
 
 pragma solidity 0.8.26;
 
-contract MockWrappedM {
+contract MockMToken {
     mapping(address account => uint256 balance) public balanceOf;
+    mapping(address account => bool isEarning) public isEarning;
+    mapping(address account => uint240 principal) public principalBalanceOf;
+
+    uint256 public currentIndex;
 
     function permit(
         address owner,
@@ -31,6 +35,26 @@ contract MockWrappedM {
 
     function setBalanceOf(address account, uint256 balance) external {
         balanceOf[account] = balance;
+    }
+
+    function setPrincipalBalanceOf(address account, uint240 principal) external {
+        principalBalanceOf[account] = principal;
+    }
+
+    function setCurrentIndex(uint256 index) external {
+        currentIndex = index;
+    }
+
+    function setIsEarning(address account, bool isEarning_) external {
+        isEarning[account] = isEarning_;
+    }
+
+    function startEarning() external {
+        isEarning[msg.sender] = true;
+    }
+
+    function stopEarning() external {
+        isEarning[msg.sender] = false;
     }
 }
 

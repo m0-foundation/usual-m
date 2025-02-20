@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.26;
 
+import { IndexingMath } from "../../lib/common/src/libs/IndexingMath.sol";
+import { UIntMath } from "../../lib/common/src/libs/UIntMath.sol";
+
 import {
     ERC20PausableUpgradeable
 } from "../../lib/openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
@@ -14,7 +17,7 @@ import {
 
 import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { IWrappedMLike } from "./interfaces/IWrappedMLike.sol";
+import { IMTokenLike } from "./interfaces/IMTokenLike.sol";
 import { IUsualM } from "./interfaces/IUsualM.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
 
@@ -23,7 +26,10 @@ import {
     USUAL_M_PAUSE,
     USUAL_M_UNPAUSE,
     BLACKLIST_ROLE,
-    USUAL_M_MINTCAP_ALLOCATOR
+    USUAL_M_MINTCAP_ALLOCATOR,
+    M_ENABLE_EARNING,
+    M_DISABLE_EARNING,
+    M_CLAIM_EXCESS
 } from "./constants.sol";
 
 /**
@@ -37,9 +43,11 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     struct UsualMStorageV0 {
         // 1st slot
         uint96 mintCap;
-        address wrappedM;
+        address mToken;
         // 2nd slot
         address registryAccess;
+        // 3rd slot
+        int144 roundingError;
         // next slots
         mapping(address => bool) isBlacklisted;
     }
@@ -71,8 +79,8 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
 
     /* ============ Initializer ============ */
 
-    function initialize(address wrappedM_, address registryAccess_) public initializer {
-        if (wrappedM_ == address(0)) revert ZeroWrappedM();
+    function initialize(address mToken_, address registryAccess_) public initializer {
+        if (mToken_ == address(0)) revert ZeroMToken();
         if (registryAccess_ == address(0)) revert ZeroRegistryAccess();
 
         __ERC20_init("UsualM", "USUALM");
@@ -80,7 +88,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         __ERC20Permit_init("UsualM");
 
         UsualMStorageV0 storage $ = _usualMStorageV0();
-        $.wrappedM = wrappedM_;
+        $.mToken = mToken_;
         $.registryAccess = registryAccess_;
     }
 
@@ -105,7 +113,7 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         if (amount == 0) revert InvalidAmount();
 
         // NOTE: `permit` call failures can be safely ignored to remove the risk of transactions being reverted due to front-run.
-        try IWrappedMLike(wrappedM()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
+        try IMTokenLike(mToken()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
 
         return _wrap(msg.sender, recipient, amount);
     }
@@ -195,6 +203,56 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         emit UnBlacklist(account);
     }
 
+    /// @inheritdoc IUsualM
+    /// @dev Can only be called by an account with the `M_ENABLE_EARNING` role.
+    function startEarningM() external {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+
+        // Check that caller has a valid access role before proceeding.
+        if (!IRegistryAccess($.registryAccess).hasRole(M_ENABLE_EARNING, msg.sender)) revert NotAuthorized();
+
+        IMTokenLike($.mToken).startEarning();
+
+        emit StartedEarningM();
+    }
+
+    /// @inheritdoc IUsualM
+    /// @dev Can only be called by an account with the `M_DISABLE_EARNING` role.
+    function stopEarningM() external {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+
+        // Check that caller has a valid access role before proceeding.
+        if (!IRegistryAccess($.registryAccess).hasRole(M_DISABLE_EARNING, msg.sender)) revert NotAuthorized();
+
+        IMTokenLike($.mToken).stopEarning();
+
+        emit StoppedEarningM();
+    }
+
+    /// @inheritdoc IUsualM
+    /// @dev Can only be called by an account with the `M_CLAIM_EXCESS` role.
+    function claimExcessM(address recipient) external returns (uint240 claimed_) {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+
+        // Check that caller has a valid access role before proceeding.
+        if (!IRegistryAccess($.registryAccess).hasRole(M_CLAIM_EXCESS, msg.sender)) revert NotAuthorized();
+
+        int248 excessM_ = excessM();
+
+        if (excessM_ <= 0) revert NoExcessM();
+
+        address mToken_ = $.mToken;
+
+        claimed_ = _getSafeTransferableM(mToken_, address(this), uint240(uint248(excessM_)));
+
+        // NOTE: The behavior of `IMTokenLike.transfer` is known, so its return can be ignored.
+        IMTokenLike(mToken_).transfer(recipient, claimed_);
+
+        emit ClaimedExcessM(recipient, claimed_);
+
+        return claimed_;
+    }
+
     /* ============ External View/Pure Functions ============ */
 
     /// @inheritdoc IERC20Metadata
@@ -203,9 +261,9 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     }
 
     /// @inheritdoc IUsualM
-    function wrappedM() public view returns (address) {
+    function mToken() public view returns (address) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
-        return $.wrappedM;
+        return $.mToken;
     }
 
     /// @inheritdoc IUsualM
@@ -234,6 +292,19 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         return _min(amount, mintCap_ > totalSupply_ ? mintCap_ - totalSupply_ : 0);
     }
 
+    /// @inheritdoc IUsualM
+    function excessM() public view returns (int248) {
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+
+        unchecked {
+            int248 mBalance_ = int248(uint248(_mBalanceOf($.mToken, address(this))));
+            int248 earmarked_ = int248(uint248(totalSupply())) + $.roundingError;
+
+            // The entire M balance is excess if the total supply (factoring rounding errors) is less than 0.
+            return earmarked_ <= 0 ? mBalance_ : mBalance_ - earmarked_;
+        }
+    }
+
     /* ============ Internal Interactive Functions ============ */
 
     /**
@@ -245,9 +316,25 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
      */
     function _wrap(address account, address recipient, uint256 amount) internal returns (uint256 wrapped) {
         UsualMStorageV0 storage $ = _usualMStorageV0();
+        address mToken_ = $.mToken;
 
-        // NOTE: The behavior of `IWrappedMLike.transferFrom` is known, so its return can be ignored.
-        IWrappedMLike($.wrappedM).transferFrom(account, address(this), amount);
+        uint240 startingBalance_ = _mBalanceOf(mToken_, address(this));
+
+        // NOTE: The behavior of `IMTokenLike.transferFrom` is known, so its return can be ignored.
+        IMTokenLike(mToken_).transferFrom(
+            account,
+            address(this),
+            _getSafeTransferableM(mToken_, account, UIntMath.safe240(amount))
+        );
+
+        // NOTE: When this WrappedMToken contract is earning, any amount of M sent to it is converted to a principal
+        //       amount at the MToken contract, which when represented as a present amount, may be a rounding error
+        //       amount more/less than `amount_`. In order to capture the real increase in M, the difference between the
+        //       starting and ending M balance is captured.
+        uint240 increase_ = _mBalanceOf(mToken_, address(this)) - startingBalance_;
+
+        // If the M gained is more/less than the wM minted, then the difference is subtracted/added to `roundingError`.
+        $.roundingError += int144(int256(uint256(amount)) - int256(uint256(increase_)));
 
         _mint(recipient, wrapped = amount);
     }
@@ -262,8 +349,22 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
     function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
         _burn(account, amount);
 
-        // NOTE: The behavior of `IWrappedMLike.transfer` is known, so its return can be ignored.
-        IWrappedMLike(wrappedM()).transfer(recipient, unwrapped = amount);
+        UsualMStorageV0 storage $ = _usualMStorageV0();
+        address mToken_ = $.mToken;
+
+        uint240 startingBalance_ = _mBalanceOf(mToken_, address(this));
+
+        // NOTE: The behavior of `IMTokenLike.transfer` is known, so its return can be ignored.
+        IMTokenLike(mToken_).transfer(recipient, unwrapped = amount);
+
+        // NOTE: When this WrappedMToken contract is earning, any amount of M sent from it is converted to a principal
+        //       amount at the MToken contract, which when represented as a present amount, may be a rounding error
+        //       amount more than `amount_`. In order to capture the real decrease in M, the difference between the
+        //       ending and starting M balance is captured.
+        uint240 decrease_ = startingBalance_ - _mBalanceOf(mToken_, address(this));
+
+        // If the M lost is more than the wM burned, then the difference is added to `roundingError`.
+        $.roundingError += int144(int256(uint256(decrease_)) - int256(uint256(amount)));
     }
 
     /**
@@ -284,6 +385,45 @@ contract UsualM is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualM {
         if (from == address(0) && totalSupply() + amount > $.mintCap) revert MintCapExceeded();
 
         ERC20PausableUpgradeable._update(from, to, amount);
+    }
+
+    /* ============ Internal View Functions ============ */
+
+    /**
+     * @dev    Compute the adjusted amount of M that can safely be transferred given the current index.
+     * @param  mToken_ The address of the M token.
+     * @param  account The address of the account sending M.
+     * @param  amount The amount to transfer.
+     * @return The adjusted amount that can safely be transferred out.
+     */
+    function _getSafeTransferableM(address mToken_, address account, uint240 amount) internal view returns (uint240) {
+        // If `account` is not earning, no need to adjust `amount_`.
+        if (!IMTokenLike(mToken_).isEarning(account)) return amount;
+
+        uint128 currentMIndex_ = IMTokenLike(mToken_).currentIndex();
+        uint112 startingPrincipal_ = uint112(IMTokenLike(mToken_).principalBalanceOf(account));
+        uint240 startingBalance_ = IndexingMath.getPresentAmountRoundedDown(startingPrincipal_, currentMIndex_);
+
+        // Adjust `amount` to ensure it's M balance decrement is limited to `amount`.
+        unchecked {
+            uint112 minEndingPrincipal_ = IndexingMath.getPrincipalAmountRoundedUp(
+                startingBalance_ - amount,
+                currentMIndex_
+            );
+
+            return IndexingMath.getPresentAmountRoundedDown(startingPrincipal_ - minEndingPrincipal_, currentMIndex_);
+        }
+    }
+
+    /**
+     * @dev    Returns the M Token balance of `account`.
+     * @param  mToken_ The address of the M token.
+     * @param  account The account being queried.
+     * @return The M Token balance of the account.
+     */
+    function _mBalanceOf(address mToken_, address account) internal view returns (uint240) {
+        // NOTE: M Token balance are limited to `uint240`.
+        return uint240(IMTokenLike(mToken_).balanceOf(account));
     }
 
     /// @dev Compares two uint256 values and returns the lesser one.

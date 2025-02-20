@@ -2,10 +2,11 @@
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
+import { Test } from "../../../lib/forge-std/src/Test.sol";
 import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import { IndexingMath } from "../../../lib/common/src/libs/IndexingMath.sol";
 
-import { MockWrappedM, MockRegistryAccess } from "../../utils/Mocks.sol";
+import { MockMToken, MockRegistryAccess } from "../../utils/Mocks.sol";
 
 import {
     DEFAULT_ADMIN_ROLE,
@@ -13,13 +14,19 @@ import {
     USUAL_M_PAUSE,
     USUAL_M_UNPAUSE,
     BLACKLIST_ROLE,
-    USUAL_M_MINTCAP_ALLOCATOR
+    USUAL_M_MINTCAP_ALLOCATOR,
+    M_ENABLE_EARNING,
+    M_DISABLE_EARNING,
+    M_CLAIM_EXCESS
 } from "../../../src/usual/constants.sol";
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
+import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 
 contract UsualMUnitTests is Test {
+    uint56 internal constant EXP_SCALED_ONE = 1e12;
+
     address internal _treasury = makeAddr("treasury");
 
     address internal _admin = makeAddr("admin");
@@ -37,25 +44,30 @@ contract UsualMUnitTests is Test {
 
     address internal _mintCapAllocator = makeAddr("mintCapAllocator");
 
+    address internal _mEarningEnabler = makeAddr("mEarningEnabler");
+    address internal _mEarningDisabler = makeAddr("mEarningDisabler");
+    address internal _mExcessClaimer = makeAddr("mClaimer");
+
     address[] internal _accounts = [_alice, _bob, _charlie, _david];
 
-    MockWrappedM internal _wrappedM;
+    MockMToken internal _mToken;
     MockRegistryAccess internal _registryAccess;
 
     UsualM internal _usualM;
 
-    event MintCapSet(uint256 newMintCap);
-
     function setUp() external {
-        _wrappedM = new MockWrappedM();
+        _mToken = new MockMToken();
         _registryAccess = new MockRegistryAccess();
+
+        // Set initial index
+        _mToken.setCurrentIndex(EXP_SCALED_ONE);
 
         // Set default admin role.
         _registryAccess.grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
         _usualM = new UsualM();
         _resetInitializerImplementation(address(_usualM));
-        _usualM.initialize(address(_wrappedM), address(_registryAccess));
+        _usualM.initialize(address(_mToken), address(_registryAccess));
 
         // Set pauser/unpauser role.
         vm.prank(_admin);
@@ -67,13 +79,27 @@ contract UsualMUnitTests is Test {
         vm.prank(_admin);
         _registryAccess.grantRole(BLACKLIST_ROLE, _blacklister);
 
-        // Fund accounts with WrappedM tokens and allow them to unwrap.
+        // Fund accounts with M tokens and allow them to unwrap.
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _wrappedM.setBalanceOf(_accounts[i], 10e6);
+            address account_ = _accounts[i];
+
+            _mToken.setBalanceOf(account_, 10e6);
+            _mToken.setIsEarning(account_, false);
 
             vm.prank(_admin);
-            _registryAccess.grantRole(USUAL_M_UNWRAP, _accounts[i]);
+            _registryAccess.grantRole(USUAL_M_UNWRAP, account_);
         }
+
+        // Grant M_ENABLE_EARNING and M_DISABLE_EARNING roles
+        vm.prank(_admin);
+        _registryAccess.grantRole(M_ENABLE_EARNING, _mEarningEnabler);
+
+        vm.prank(_admin);
+        _registryAccess.grantRole(M_DISABLE_EARNING, _mEarningDisabler);
+
+        // Grant M_CLAIM_EXCESS role
+        vm.prank(_admin);
+        _registryAccess.grantRole(M_CLAIM_EXCESS, _mExcessClaimer);
 
         // Add mint cap allocator role to a separate address
         vm.prank(_admin);
@@ -86,7 +112,7 @@ contract UsualMUnitTests is Test {
 
     /* ============ initialization ============ */
     function test_init() external view {
-        assertEq(_usualM.wrappedM(), address(_wrappedM));
+        assertEq(_usualM.mToken(), address(_mToken));
         assertEq(_usualM.registryAccess(), address(_registryAccess));
         assertEq(_usualM.name(), "UsualM");
         assertEq(_usualM.symbol(), "USUALM");
@@ -98,8 +124,8 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        assertEq(_wrappedM.balanceOf(_alice), 0);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 10e6);
+        assertEq(_mToken.balanceOf(_alice), 0);
+        assertEq(_mToken.balanceOf(address(_usualM)), 10e6);
 
         assertEq(_usualM.balanceOf(_alice), 10e6);
     }
@@ -108,8 +134,8 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 5e6);
 
-        assertEq(_wrappedM.balanceOf(_alice), 5e6);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 5e6);
+        assertEq(_mToken.balanceOf(_alice), 5e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
 
         assertEq(_usualM.balanceOf(_alice), 5e6);
     }
@@ -118,8 +144,8 @@ contract UsualMUnitTests is Test {
         vm.prank(_bob);
         _usualM.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0));
 
-        assertEq(_wrappedM.balanceOf(_alice), 10e6);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 5e6);
+        assertEq(_mToken.balanceOf(_alice), 10e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
         assertEq(_usualM.balanceOf(_alice), 5e6);
 
         assertEq(_usualM.balanceOf(_bob), 0);
@@ -175,7 +201,7 @@ contract UsualMUnitTests is Test {
         vm.prank(_mintCapAllocator);
         _usualM.setMintCap(mintCap);
 
-        _wrappedM.setBalanceOf(_alice, wrapAmount);
+        _mToken.setBalanceOf(_alice, wrapAmount);
 
         // Wrap tokens up to the mint cap
         vm.prank(_alice);
@@ -193,11 +219,43 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, _alice),
+            abi.encode(false)
+        );
+
         vm.prank(_alice);
         _usualM.unwrap(_alice, 5e6);
 
-        assertEq(_wrappedM.balanceOf(_alice), 5e6);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 5e6);
+        assertEq(_mToken.balanceOf(_alice), 5e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+
+        assertEq(_usualM.balanceOf(_alice), 5e6);
+    }
+
+    function test_unwrap_usualMNotEarning() external {
+        vm.prank(_alice);
+        _usualM.wrap(_alice, 10e6);
+
+        vm.mockCall(address(_mToken), abi.encodeWithSelector(IMTokenLike.isEarning.selector, _alice), abi.encode(true));
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, address(_usualM)),
+            abi.encode(false)
+        );
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.principalBalanceOf.selector, _alice),
+            abi.encode(0)
+        );
+
+        vm.prank(_alice);
+        _usualM.unwrap(_alice, 5e6);
+
+        assertEq(_mToken.balanceOf(_alice), 5e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
 
         assertEq(_usualM.balanceOf(_alice), 5e6);
     }
@@ -206,20 +264,26 @@ contract UsualMUnitTests is Test {
         vm.prank(_alice);
         _usualM.wrap(_alice, 10e6);
 
-        assertEq(_wrappedM.balanceOf(_alice), 0);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 10e6);
+        assertEq(_mToken.balanceOf(_alice), 0);
+        assertEq(_mToken.balanceOf(address(_usualM)), 10e6);
         assertEq(_usualM.balanceOf(_alice), 10e6);
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, _alice),
+            abi.encode(false)
+        );
 
         vm.prank(_alice);
         _usualM.unwrap(_alice, 10e6);
 
-        assertEq(_wrappedM.balanceOf(_alice), 10e6);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 0);
+        assertEq(_mToken.balanceOf(_alice), 10e6);
+        assertEq(_mToken.balanceOf(address(_usualM)), 0);
 
         assertEq(_usualM.balanceOf(_alice), 0);
     }
 
-    function test_unwarp_notAllowed() external {
+    function test_unwrap_notAllowed() external {
         vm.expectRevert(IUsualM.NotAuthorized.selector);
 
         vm.prank(_other);
@@ -439,10 +503,42 @@ contract UsualMUnitTests is Test {
 
     function test_setMintCap_emitsEvent() external {
         vm.expectEmit(false, false, false, true);
-        emit MintCapSet(100e6);
+        emit IUsualM.MintCapSet(100e6);
 
         vm.prank(_mintCapAllocator);
         _usualM.setMintCap(100e6);
+    }
+
+    /* ============ startEarningM ============ */
+    function test_startEarningM() external {
+        vm.expectCall(address(_mToken), abi.encodeCall(_mToken.startEarning, ()));
+
+        vm.expectEmit();
+        emit IUsualM.StartedEarningM();
+
+        vm.prank(_mEarningEnabler);
+        _usualM.startEarningM();
+    }
+
+    function test_startEarningM_unauthorized() external {
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
+        _usualM.startEarningM();
+    }
+
+    /* ============ stopEarningM ============ */
+    function test_stopEarningM() external {
+        vm.expectCall(address(_mToken), abi.encodeCall(_mToken.stopEarning, ()));
+
+        vm.expectEmit();
+        emit IUsualM.StoppedEarningM();
+
+        vm.prank(_mEarningDisabler);
+        _usualM.stopEarningM();
+    }
+
+    function test_stopEarningM_unauthorized() external {
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
+        _usualM.stopEarningM();
     }
 
     /* ============ wrappable amount ============ */
@@ -464,7 +560,133 @@ contract UsualMUnitTests is Test {
         assertEq(_usualM.getWrappableAmount(20e6), 20e6);
     }
 
+    /* ============ excess ============ */
+    function test_excessM() external {
+        uint256 amount_ = 100e6;
+        uint240 yield_ = 10e6;
+
+        // Fund alice account with 100 M tokens
+        _mToken.setBalanceOf(_alice, amount_);
+
+        // Wrap some tokens
+        vm.prank(_alice);
+        _usualM.wrap(_alice, amount_);
+
+        // Simulate yield accumulation
+        _mToken.setBalanceOf(address(_usualM), amount_ + yield_);
+        _mToken.setIsEarning(address(_usualM), true);
+
+        // Check excess
+        assertEq(uint240(int240(_usualM.excessM())), yield_);
+    }
+
+    function test_excessM_noYield() external {
+        uint256 amount_ = 100e6;
+
+        _mToken.setBalanceOf(_alice, amount_);
+
+        // Wrap some tokens
+        vm.prank(_alice);
+        _usualM.wrap(_alice, amount_);
+
+        // No yield has accumulated yet
+        _mToken.setBalanceOf(address(_usualM), amount_);
+
+        // Check excess
+        assertEq(_usualM.excessM(), 0);
+    }
+
+    function testFuzz_excessM(uint128 currentMIndex_, uint256 wrapAmount_) external {
+        _mToken.setCurrentIndex(EXP_SCALED_ONE);
+
+        uint256 maxAmount_ = type(uint96).max;
+
+        vm.prank(_mintCapAllocator);
+        _usualM.setMintCap(maxAmount_);
+
+        wrapAmount_ = bound(wrapAmount_, 0, maxAmount_);
+        if (wrapAmount_ == 0) return;
+
+        _mToken.setBalanceOf(_alice, wrapAmount_);
+
+        vm.prank(_alice);
+        wrapAmount_ = _usualM.wrap(_alice, wrapAmount_);
+
+        _mToken.setIsEarning(address(_usualM), true);
+
+        uint256 mTokenBalanceBefore_ = _mToken.balanceOf(address(_usualM));
+        uint112 mTokenPrincipalBalance_ = IndexingMath.getPrincipalAmountRoundedUp(
+            uint240(mTokenBalanceBefore_),
+            EXP_SCALED_ONE
+        );
+
+        // Simulate yield accumulation
+        currentMIndex_ = uint128(bound(currentMIndex_, EXP_SCALED_ONE, 10 * EXP_SCALED_ONE));
+        _mToken.setCurrentIndex(currentMIndex_);
+
+        _mToken.setBalanceOf(
+            address(_usualM),
+            IndexingMath.getPresentAmountRoundedDown(mTokenPrincipalBalance_, currentMIndex_)
+        );
+
+        uint240 yield_ = uint240(_mToken.balanceOf(address(_usualM)) - mTokenBalanceBefore_);
+
+        assertEq(_usualM.excessM(), int248(uint248(yield_)));
+    }
+
+    /* ============ claimExcessM ============ */
+    function test_claimExcessM() external {
+        uint256 amount_ = 100e6;
+        uint240 yield_ = 10e6;
+
+        // Fund alice account with 100 M tokens
+        _mToken.setBalanceOf(_alice, amount_);
+
+        // Wrap some tokens
+        vm.prank(_alice);
+        _usualM.wrap(_alice, amount_);
+
+        // Simulate yield accumulation
+        _mToken.setBalanceOf(address(_usualM), amount_ + yield_);
+
+        assertEq(_mToken.balanceOf(_treasury), 0);
+
+        vm.prank(_mExcessClaimer);
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.principalBalanceOf.selector, address(_usualM)),
+            abi.encode(IndexingMath.getPrincipalAmountRoundedUp(uint240(amount_ + yield_), EXP_SCALED_ONE))
+        );
+
+        vm.mockCall(
+            address(_mToken),
+            abi.encodeWithSelector(IMTokenLike.isEarning.selector, address(_usualM)),
+            abi.encode(true)
+        );
+
+        vm.expectEmit();
+        emit IUsualM.ClaimedExcessM(_treasury, yield_);
+
+        assertEq(_usualM.claimExcessM(_treasury), yield_);
+        assertEq(_mToken.balanceOf(_treasury), yield_);
+    }
+
+    function test_claimExcessM_unauthorized() external {
+        vm.expectRevert(IUsualM.NotAuthorized.selector);
+        _usualM.claimExcessM(_treasury);
+    }
+
+    function test_claimExcessM_noYield() external {
+        vm.expectRevert(IUsualM.NoExcessM.selector);
+        vm.prank(_mExcessClaimer);
+
+        assertEq(_usualM.claimExcessM(_treasury), 0);
+        assertEq(_mToken.balanceOf(_treasury), 0);
+    }
+
     /* ============ utils ============ */
+
     function _resetInitializerImplementation(address implementation) internal {
         // keccak256(abi.encode(uint256(keccak256("openzeppelin.storage.Initializable")) - 1)) & ~bytes32(uint256(0xff))
         bytes32 INITIALIZABLE_STORAGE = 0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;

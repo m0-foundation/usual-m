@@ -13,3 +13,9 @@ bytes32 constant USUAL_M_UNPAUSE = keccak256("USUAL_M_UNPAUSE");
 bytes32 constant BLACKLIST_ROLE = keccak256("BLACKLIST_ROLE");
 
 bytes32 constant USUAL_M_MINTCAP_ALLOCATOR = keccak256("USUAL_M_MINTCAP_ALLOCATOR");
+
+bytes32 constant M_ENABLE_EARNING = keccak256("M_ENABLE_EARNING");
+
+bytes32 constant M_DISABLE_EARNING = keccak256("M_DISABLE_EARNING");
+
+bytes32 constant M_CLAIM_EXCESS = keccak256("M_CLAIM_EXCESS");

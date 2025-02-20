@@ -22,11 +22,29 @@ interface IUsualM is IERC20Metadata {
     /// @notice Emitted when mint cap is set.
     event MintCapSet(uint256 newMintCap);
 
+    /// @notice Emitted when UsualM started earning M.
+    event StartedEarningM();
+
+    /// @notice Emitted when UsualM stopped earning M.
+    event StoppedEarningM();
+
+    /**
+     * @notice Emitted when excess M from UsualM is claimed.
+     * @param  recipient The address receiving the excess M.
+     * @param  amount    The amount of M claimed.
+     */
+    event ClaimedExcessM(address indexed recipient, uint240 amount);
+
+    /* ============ Custom Errors ============ */
+
     /// @notice Emitted when token transfers/wraps are attempted by blacklisted account.
     error Blacklisted();
 
     /// @notice Emitted when action is performed by unauthorized account.
     error NotAuthorized();
+
+    /// @notice Emitted when there is no excess M to claim.
+    error NoExcessM();
 
     /// @notice Emitted when blacklist/unBlacklist action is performed on the account that is already in desired state.
     error SameValue();
@@ -35,7 +53,7 @@ interface IUsualM is IERC20Metadata {
     error ZeroAddress();
 
     /// @notice Emitted if WrappedM Token is 0x0.
-    error ZeroWrappedM();
+    error ZeroMToken();
 
     /// @notice Emitted if Registry Access is 0x0.
     error ZeroRegistryAccess();
@@ -87,6 +105,8 @@ interface IUsualM is IERC20Metadata {
      */
     function unwrap(address recipient, uint256 amount) external returns (uint256);
 
+    /* ============ Special Admin Functions ============ */
+
     /**
      * @notice Adds an address to the blacklist.
      * @dev Can only be called by the `BLACKLIST_ROLE`.
@@ -118,13 +138,34 @@ interface IUsualM is IERC20Metadata {
      **/
     function setMintCap(uint256 newMintCap) external;
 
+    /**
+     * @notice Starts earning M on behalf of UsualM.
+     * @dev Can only be called by the `M_ENABLE_EARNING` role.
+     */
+    function startEarningM() external;
+
+    /**
+     * @notice Stops earning M on behalf of UsualM.
+     * @dev Can only be called by the `M_DISABLE_EARNING` role.
+     */
+    function stopEarningM() external;
+
+    /**
+     * @notice Claims the excess M earned by UsualM.
+     * @dev Can only be called by the `M_CLAIM_EXCESS` role.
+     * @dev Will return early if there is no excess M to claim.
+     * @param recipient The account receiving the excess M.
+     * @return The amount of M claimed.
+     */
+    function claimExcessM(address recipient) external returns (uint240);
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice Returns whether the account is blacklisted.
     function isBlacklisted(address account) external view returns (bool);
 
-    /// @notice Returns the WrappedM Token address.
-    function wrappedM() external view returns (address);
+    /// @notice Returns the M token address.
+    function mToken() external view returns (address);
 
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);
@@ -134,4 +175,11 @@ interface IUsualM is IERC20Metadata {
 
     /// @notice Returns the available wrappable amount for the current values of `mintCap` and `totalSupply`.
     function getWrappableAmount(uint256 amount) external view returns (uint256);
+
+    /**
+     * @notice Returns the amount of M in excess earned by UsualM.
+     * @dev This amount can be negative if the earmarked M (UsualM total supply + rounding error)
+     *      is greater than the current M balance of UsualM.
+     */
+    function excessM() external view returns (int248);
 }

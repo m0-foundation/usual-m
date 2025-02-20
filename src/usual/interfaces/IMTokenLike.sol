@@ -2,12 +2,11 @@
 
 pragma solidity 0.8.26;
 
-// TODO: remove once code migration as been completed
 /**
- * @title  Subset of Wrapped M Token interface required for source contracts.
+ * @title  Subset of M Token interface required for source contracts.
  * @author M^0 Labs
  */
-interface IWrappedMLike {
+interface IMTokenLike {
     /* ============ Interactive Functions ============ */
 
     /**
@@ -56,34 +55,13 @@ interface IWrappedMLike {
      */
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool success);
 
-    /**
-     * @notice Starts earning for `account` if allowed by the Registrar.
-     * @param  account The account to start earning for.
-     */
-    function startEarningFor(address account) external;
+    /// @notice Starts earning for caller if allowed by TTG.
+    function startEarning() external;
 
-    /**
-     * @notice Claims any claimable yield for `account`.
-     * @param  account The account under which yield was generated.
-     * @return yield   The amount of yield claimed.
-     */
-    function claimFor(address account) external returns (uint240 yield);
+    /// @notice Stops earning for caller.
+    function stopEarning() external;
 
     /* ============ View/Pure Functions ============ */
-
-    /**
-     * @notice Returns the yield accrued for `account`, which is claimable.
-     * @param  account The account being queried.
-     * @return yield   The amount of yield that is claimable.
-     */
-    function accruedYieldOf(address account) external view returns (uint240 yield);
-
-    /**
-     * @notice Returns the recipient to override as the destination for an account's claim of yield.
-     * @param  account   The account being queried.
-     * @return recipient The address of the recipient, if any, to override as the destination of claimed yield.
-     */
-    function claimOverrideRecipientFor(address account) external view returns (address recipient);
 
     /**
      * @notice Checks if account is an earner.
@@ -102,21 +80,19 @@ interface IWrappedMLike {
     /// @notice The current index that would be written to storage if `updateIndex` is called.
     function currentIndex() external view returns (uint128 currentIndex);
 
+    /**
+     * @notice The principal of an earner M token balance.
+     * @param  account   The account to get the principal balance of.
+     * @return principal The principal balance of the account.
+     */
+    function principalBalanceOf(address account) external view returns (uint240 principal);
+
     /// @notice Returns the EIP712 domain separator used in the encoding of a signed digest.
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 
     /// @notice Returns the EIP712 typehash used in the encoding of the digest for the permit function.
     function PERMIT_TYPEHASH() external view returns (bytes32);
 
-    /// @notice Returns the number of decimals UIs should assume all amounts have.
-    function decimals() external view returns (uint8);
-
-    /// @notice Returns the name of the contract/token.
-    function name() external view returns (string memory);
-
-    /// @notice Returns the symbol of the token.
-    function symbol() external view returns (string memory);
-
-    /// @notice Returns the current total supply of the token.
-    function totalSupply() external view returns (uint256);
+    /// @notice The address of the TTG Registrar contract.
+    function ttgRegistrar() external view returns (address ttgRegistrar);
 }
