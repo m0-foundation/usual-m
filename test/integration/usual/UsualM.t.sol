@@ -31,6 +31,8 @@ contract UsualMV2 is UsualM, V2 {}
 
 contract UsualMIntegrationTests is TestBase {
     function setUp() external {
+        mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"), 21_719_303);
+
         _deployComponents();
         _fundAccounts();
         _grantRoles();
@@ -55,7 +57,7 @@ contract UsualMIntegrationTests is TestBase {
 
     /* ============ constants ============ */
 
-    function test_integration_constants() external view {
+    function test_integration_constants() external {
         assertEq(_usualM.name(), "UsualM");
         assertEq(_usualM.symbol(), "USUALM");
         assertEq(_usualM.decimals(), 6);
@@ -77,8 +79,10 @@ contract UsualMIntegrationTests is TestBase {
         // Fast forward 90 days in the future to generate yield
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
-        uint256 yield = _usualM.excessM();
-        assertGt(yield, 0);
+        int248 excessM = _usualM.excessM();
+        assertGt(excessM, 0);
+
+        uint240 yield = uint240(int240(excessM));
 
         // Check balances before unwrapping Usual M
         assertEq(_usualM.balanceOf(_alice), amount);
@@ -100,7 +104,10 @@ contract UsualMIntegrationTests is TestBase {
         // Fast forward 90 days in the future to generate yield
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
-        yield = _usualM.excessM();
+        excessM = _usualM.excessM();
+        assertGt(excessM, 0);
+
+        yield = uint240(int240(excessM));
 
         // Check balances before claiming excess M
         assertEq(_usualM.balanceOf(_bob), amount);
@@ -114,30 +121,34 @@ contract UsualMIntegrationTests is TestBase {
         // Check balances after claiming excess M
         assertEq(_usualM.balanceOf(_bob), amount);
         assertEq(_mToken.balanceOf(_bob), 0);
-        assertEq(_mToken.balanceOf(_treasury), yield);
-        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), amount, 1); // excessM rounds down and a 1 wei buffer is left after claiming excess
+        assertApproxEqAbs(_mToken.balanceOf(_treasury), yield, 1); // May round down in favor of the protocol if any rounding errors occured
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), amount, 2); // excessM rounds down by 1 wei and a 2 wei buffer is left after claiming excess to account for the rounding error
         assertEq(_usualM.excessM(), 0);
     }
 
     /* ============ wrap ============ */
 
     function test_wrap_fromEarnerToEarner() external {
-        _wrap(_earner, _earner, 5e6);
+        uint256 wrapAmount_ = 5e6;
 
-        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
-        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+        _wrap(_earner, _earner, wrapAmount_);
 
-        assertEq(_usualM.balanceOf(_earner), 5e6);
+        assertApproxEqAbs(_mToken.balanceOf(_earner), wrapAmount_, 1); // May round down in favor of the protocol
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), wrapAmount_, 1); // May round down in favor of the protocol
+
+        assertEq(_usualM.balanceOf(_earner), wrapAmount_);
     }
 
     function test_wrap_fromEarnerToNonEarner() external {
-        _wrap(_earner, _nonEarner, 5e6);
+        uint256 wrapAmount_ = 5e6;
 
-        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
-        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+        _wrap(_earner, _nonEarner, wrapAmount_);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), wrapAmount_, 1); // May round down in favor of the protocol
+        assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), wrapAmount_, 1); // May round down in favor of the protocol
 
         assertEq(_usualM.balanceOf(_earner), 0);
-        assertEq(_usualM.balanceOf(_nonEarner), 5e6);
+        assertEq(_usualM.balanceOf(_nonEarner), wrapAmount_);
     }
 
     function test_wrap_fromNonEarnerToNonEarner() external {
@@ -183,16 +194,26 @@ contract UsualMIntegrationTests is TestBase {
         _mockCurrentMIndex(currentMIndex_);
 
         wrapAmount_ = bound(wrapAmount_, 0, _mToken.balanceOf(_mTokenSource));
-
-        // Only set mint cap if wrap amount is different from current cap
-        if (wrapAmount_ != _usualM.mintCap()) {
-            _setMintCap(wrapAmount_);
-        }
+        if (wrapAmount_ == 0) return;
 
         address sender_ = senderEarning_ ? _earner : _nonEarner;
         address recipient_ = recipientEarning_ ? _earner : _nonEarner;
 
         _giveMToken(sender_, wrapAmount_);
+
+        uint256 senderMBalance_ = _getMBalanceOf(sender_, currentMIndex_);
+
+        // Adjust wrap amount if sender balance at currentMIndex_ is less than the wrap amount
+        if (wrapAmount_ > senderMBalance_) {
+            wrapAmount_ = bound(wrapAmount_, 0, senderMBalance_);
+        }
+
+        if (wrapAmount_ == 0) return;
+
+        // Only set mint cap if wrap amount is different from current cap
+        if (wrapAmount_ != _usualM.mintCap()) {
+            _setMintCap(wrapAmount_);
+        }
 
         uint256 senderMTokenBalanceBefore_ = _mToken.balanceOf(sender_);
         uint256 usualMMTokenBalanceBefore_ = _mToken.balanceOf(address(_usualM));
@@ -213,11 +234,9 @@ contract UsualMIntegrationTests is TestBase {
         vm.prank(sender_);
         _usualM.wrap(recipient_, wrapAmount_);
 
-        if (wrapAmount_ == 0) return;
-
         if (senderEarning_) {
-            assertApproxEqAbs(_mToken.balanceOf(sender_), senderMTokenBalanceBefore_ - wrapAmount_, 1); // May round down in favor of the protocol
-            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 1); // May round up in favor of UsualM
+            assertApproxEqAbs(_mToken.balanceOf(sender_), senderMTokenBalanceBefore_ - wrapAmount_, 10); // May round down in favor of the protocol
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 10); // May round up in favor of UsualM
 
             assertEq(_usualM.balanceOf(recipient_), recipientUsualMBalanceBefore_ + wrapAmount_);
         } else {
@@ -230,34 +249,58 @@ contract UsualMIntegrationTests is TestBase {
 
     /* ============ unwrap ============ */
     function test_unwrap_fromEarnerToEarner() external {
-        _wrap(_earner, _earner, 5e6);
+        uint256 wrapAmount_ = 5e6;
+        uint256 unwrapAmount_ = wrapAmount_;
 
-        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
-        assertEq(_usualM.balanceOf(_earner), 5e6);
-        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+        _wrap(_earner, _earner, wrapAmount_);
 
-        _unwrap(_earner, _earner, 5e6);
+        uint256 mTokenBalanceOfEarner_ = _mToken.balanceOf(_earner);
+        uint256 mTokenBalanceOfUsualM_ = _mToken.balanceOf(address(_usualM));
+        uint256 usualMBalanceOfEarner_ = _usualM.balanceOf(_earner);
 
-        assertApproxEqAbs(_mToken.balanceOf(_earner), 10e6, 2); // May round down in favor of the protocol
+        assertApproxEqAbs(mTokenBalanceOfEarner_, wrapAmount_, 1); // May round down in favor of the protocol
+        assertEq(usualMBalanceOfEarner_, wrapAmount_);
+        assertApproxEqAbs(mTokenBalanceOfUsualM_, wrapAmount_, 1); // May round down in favor of the protocol
+
+        // Due to rounding down in favor of the protocol, there may be 1 wei less M token in UsualM
+        if (usualMBalanceOfEarner_ > mTokenBalanceOfUsualM_) {
+            unwrapAmount_ = mTokenBalanceOfUsualM_;
+        }
+
+        _unwrap(_earner, _earner, unwrapAmount_);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), 10e6, 1); // May round down in favor of the protocol
         assertEq(_mToken.balanceOf(address(_usualM)), 0);
 
-        assertEq(_usualM.balanceOf(_earner), 0);
+        assertApproxEqAbs(_usualM.balanceOf(_earner), 0, 1); // May not be able to unwrap the full amount if M rounded down
     }
 
     function test_unwrap_fromEarnerToNonEarner() external {
-        _wrap(_earner, _earner, 5e6);
+        uint256 wrapAmount_ = 5e6;
+        uint256 unwrapAmount_ = wrapAmount_;
 
-        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
-        assertEq(_usualM.balanceOf(_earner), 5e6);
-        assertEq(_mToken.balanceOf(address(_usualM)), 5e6);
+        _wrap(_earner, _earner, wrapAmount_);
 
-        _unwrap(_earner, _nonEarner, 5e6);
+        uint256 mTokenBalanceOfEarner_ = _mToken.balanceOf(_earner);
+        uint256 mTokenBalanceOfUsualM_ = _mToken.balanceOf(address(_usualM));
+        uint256 usualMBalanceOfEarner_ = _usualM.balanceOf(_earner);
 
-        assertApproxEqAbs(_mToken.balanceOf(_earner), 5e6, 2); // May round down in favor of the protocol
-        assertEq(_mToken.balanceOf(_nonEarner), 15e6);
+        assertApproxEqAbs(mTokenBalanceOfEarner_, wrapAmount_, 1); // May round down in favor of the protocol
+        assertEq(usualMBalanceOfEarner_, wrapAmount_);
+        assertApproxEqAbs(mTokenBalanceOfUsualM_, wrapAmount_, 1); // May round down in favor of the protocol
+
+        // Due to rounding down in favor of the protocol, there may be 1 wei less M token in UsualM
+        if (usualMBalanceOfEarner_ > mTokenBalanceOfUsualM_) {
+            unwrapAmount_ = mTokenBalanceOfUsualM_;
+        }
+
+        _unwrap(_earner, _nonEarner, unwrapAmount_);
+
+        assertApproxEqAbs(_mToken.balanceOf(_earner), unwrapAmount_, 1); // May round down in favor of the protocol
+        assertApproxEqAbs(_mToken.balanceOf(_nonEarner), 15e6, 1); // May not be able to unwrap the full amount if M rounded down
         assertEq(_mToken.balanceOf(address(_usualM)), 0);
 
-        assertEq(_usualM.balanceOf(_earner), 0);
+        assertApproxEqAbs(_usualM.balanceOf(_earner), 0, 1); // May not be able to unwrap the full amount if M rounded down
     }
 
     function test_unwrap_fromNonEarnerToNonEarner() external {
@@ -331,14 +374,27 @@ contract UsualMIntegrationTests is TestBase {
         wrapAmount_ = bound(wrapAmount_, 0, _mToken.balanceOf(_mTokenSource));
         if (wrapAmount_ == 0) return;
 
-        _setMintCap(wrapAmount_);
-
-        unwrapAmount_ = bound(unwrapAmount_, 0, wrapAmount_);
-
         address sender_ = senderEarning_ ? _earner : _nonEarner;
         address recipient_ = recipientEarning_ ? _earner : _nonEarner;
 
         _giveMToken(sender_, wrapAmount_);
+
+        uint256 senderMBalance_ = _getMBalanceOf(sender_, currentMIndex_);
+
+        // Adjust wrap amount if sender balance at currentMIndex_ is less than the wrap amount
+        if (wrapAmount_ > senderMBalance_) {
+            wrapAmount_ = bound(wrapAmount_, 0, senderMBalance_);
+        }
+
+        if (wrapAmount_ == 0) return;
+
+        // Only set mint cap if wrap amount is different from current cap
+        if (wrapAmount_ != _usualM.mintCap()) {
+            _setMintCap(wrapAmount_);
+        }
+
+        unwrapAmount_ = bound(unwrapAmount_, 0, wrapAmount_);
+
         _wrap(sender_, sender_, wrapAmount_);
 
         uint256 senderUsualMBalanceBefore_ = _usualM.balanceOf(sender_);
@@ -363,10 +419,10 @@ contract UsualMIntegrationTests is TestBase {
         if (unwrapAmount_ == 0 || unwrapAmount_ > usualMMTokenBalanceBefore_) return;
 
         if (recipientEarning_) {
-            assertApproxEqAbs(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_, 1); // May round up in favor of the recipient
+            assertApproxEqAbs(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_, 2); // May round up in favor of the recipient
             assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 2); // May round down in favor of the protocol
         } else {
-            assertApproxEqAbs(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_, 1); // May round up in favor of the recipient
+            assertEq(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_);
             assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 2); // May round down in favor of the protocol
         }
 

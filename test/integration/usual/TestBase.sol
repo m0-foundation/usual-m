@@ -25,6 +25,8 @@ import {
 } from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
+    uint256 public mainnetFork;
+
     uint56 internal constant EXP_SCALED_ONE = 1e12;
 
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
@@ -39,7 +41,7 @@ contract TestBase is Test {
     address internal constant _mTokenSource = 0x3f0376da3Ae4313E7a5F1dA184BAFC716252d759;
 
     IRegistryAccess internal constant _registryAccess = IRegistryAccess(0x0D374775E962c3608B8F0A4b8B10567DF739bb56);
-    address internal _admin = _registryAccess.defaultAdmin();
+    address internal _admin;
 
     address internal _treasury = makeAddr("treasury");
 
@@ -124,11 +126,14 @@ contract TestBase is Test {
 
     function _deployComponents() internal {
         _usualMImplementation = address(new UsualM());
+
         bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
             address(_mToken),
             _registryAccess
         );
+
+        _admin = _registryAccess.defaultAdmin();
         _usualM = IUsualM(address(new TransparentUpgradeableProxy(_usualMImplementation, _admin, usualMData)));
     }
 
@@ -166,10 +171,22 @@ contract TestBase is Test {
     /* ============ mock calls ============ */
 
     function _mockCurrentMIndex(uint128 mIndex_) internal {
-        vm.mockCall(address(_mToken), abi.encodeWithSelector(IMTokenLike.currentIndex.selector), abi.encode(mIndex_));
+        bytes[] memory mocks_ = new bytes[](1);
+        mocks_[0] = abi.encode(mIndex_);
+
+        vm.mockCalls(address(_mToken), abi.encodeWithSelector(IMTokenLike.currentIndex.selector), mocks_);
     }
 
     /* ============ utils ============ */
+
+    /// @dev Helper to get the M balance of account_ if account_ is not an earner,
+    ///      otherwise, get the balance of account_ at mIndex_.
+    function _getMBalanceOf(address account_, uint128 mIndex_) internal view returns (uint256) {
+        return
+            _mToken.isEarning(account_)
+                ? (_mToken.principalBalanceOf(account_) * mIndex_) / EXP_SCALED_ONE
+                : _mToken.balanceOf(account_);
+    }
 
     function _makeKey(string memory name_) internal returns (uint256 key_) {
         (, key_) = makeAddrAndKey(name_);
