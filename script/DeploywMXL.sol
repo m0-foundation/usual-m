@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 
 import { Script, console2 } from "../lib/forge-std/src/Script.sol";
 
-import { UsualM } from "../src/usual/UsualM.sol";
+import { wMXL } from "../src/wmxl/wMXL.sol";
 
 import {
     TransparentUpgradeableProxy
@@ -24,17 +24,17 @@ contract DeployUsualMScript is Script {
 
         vm.startBroadcast(deployer_);
 
-        address usualMImplementation = address(new UsualM());
-        bytes memory usualMData = abi.encodeWithSignature(
+        address wMXLImplementation = address(new wMXL());
+        bytes memory wMXLData = abi.encodeWithSignature(
             "initialize(address,address)",
             _WRAPPED_M_TOKEN,
             _USUAL_REGISTRY_ACCESS
         );
-        address usualM = address(new TransparentUpgradeableProxy(usualMImplementation, _USUAL_ADMIN, usualMData));
+        address wMXLAddress = address(new TransparentUpgradeableProxy(wMXLImplementation, _USUAL_ADMIN, wMXLData));
 
         vm.stopBroadcast();
 
-        console2.log("UsualM implementation:", usualMImplementation);
-        console2.log("UsualM:", usualM);
+        console2.log("wMXL implementation:", wMXLImplementation);
+        console2.log("wMXL:", wMXLAddress);
     }
 }

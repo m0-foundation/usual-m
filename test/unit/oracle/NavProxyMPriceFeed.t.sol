@@ -18,7 +18,7 @@ contract NAVProxyMPriceFeedUnitTests is Test {
         priceFeed = new NAVProxyMPriceFeed(address(mockNavOracle));
     }
 
-    function test_constructor() external {
+    function test_constructor() external view {
         assertEq(priceFeed.navOracle(), address(mockNavOracle));
         assertEq(priceFeed.decimals(), 8);
         assertEq(priceFeed.description(), "M by M^0 / USD");

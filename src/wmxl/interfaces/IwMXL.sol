@@ -10,7 +10,7 @@ import {
  * @title  Usual WrappedM Extension.
  * @author M^0 Labs
  */
-interface IUsualM is IERC20Metadata {
+interface IwMXL is IERC20Metadata {
     /* ============ Events ============ */
 
     /// @notice Emitted when address is added to blacklist.

@@ -11,7 +11,7 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import { ERC1967Utils } from "../../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Utils.sol";
 
-import { UsualM } from "../../../src/usual/UsualM.sol";
+import { wMXL } from "../../../src/wmxl/wMXL.sol";
 
 import { TestBase } from "./TestBase.sol";
 
@@ -24,32 +24,32 @@ contract V2 {
     }
 }
 
-contract UsualMV2 is UsualM, V2 {}
+contract wMXLV2 is wMXL, V2 {}
 
-contract UsualMIntegrationTests is TestBase {
+contract wMXLIntegrationTests is TestBase {
     function setUp() external {
         _deployComponents();
         _fundAccounts();
         _grantRoles();
 
         // Add UsualM to the list of earners
-        _setClaimOverrideRecipient(address(_usualM), _treasury);
+        _setClaimOverrideRecipient(address(_wMXL), _treasury);
 
         // Add treasury as a recipient of UsualM yield
-        _addToList(_EARNERS_LIST, address(_usualM));
-        _wrappedM.startEarningFor(address(_usualM));
+        _addToList(_EARNERS_LIST, address(_wMXL));
+        _wrappedM.startEarningFor(address(_wMXL));
 
         // Set Mint Cap
         vm.prank(_admin);
-        _usualM.setMintCap(10_000e6);
+        _wMXL.setMintCap(10_000e6);
     }
 
     function test_integration_constants() external view {
-        assertEq(_usualM.name(), "UsualM");
-        assertEq(_usualM.symbol(), "USUALM");
-        assertEq(_usualM.decimals(), 6);
-        assertEq(_wrappedM.isEarning(address(_usualM)), true);
-        assertEq(_wrappedM.claimOverrideRecipientFor(address(_usualM)), _treasury);
+        assertEq(_wMXL.name(), "wMXL");
+        assertEq(_wMXL.symbol(), "WMXL");
+        assertEq(_wMXL.decimals(), 6);
+        assertEq(_wrappedM.isEarning(address(_wMXL)), true);
+        assertEq(_wrappedM.claimOverrideRecipientFor(address(_wMXL)), _treasury);
     }
 
     function test_yieldAccumulationAndClaim() external {
@@ -58,21 +58,21 @@ contract UsualMIntegrationTests is TestBase {
         _wrap(_alice, _alice, amount);
 
         // Check balances of UsualM and Alice after wrapping
-        assertEq(_usualM.balanceOf(_alice), amount);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), amount);
+        assertEq(_wMXL.balanceOf(_alice), amount);
+        assertEq(_wrappedM.balanceOf(address(_wMXL)), amount);
 
         // Fast forward 90 days in the future to generate yield
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
-        uint256 yield = _wrappedM.accruedYieldOf(address(_usualM));
+        uint256 yield = _wrappedM.accruedYieldOf(address(_wMXL));
         assertGt(yield, 0);
 
         // Claim yield by unwrapping
         _unwrap(_alice, _alice, amount);
 
         // Check balances of UsualM and Alice after unwrapping
-        assertEq(_usualM.balanceOf(_alice), 0);
-        assertEq(_wrappedM.balanceOf(address(_usualM)), 0);
+        assertEq(_wMXL.balanceOf(_alice), 0);
+        assertEq(_wrappedM.balanceOf(address(_wMXL)), 0);
         assertEq(_wrappedM.balanceOf(_alice), amount);
 
         assertEq(_wrappedM.balanceOf(_treasury), yield);
@@ -82,12 +82,12 @@ contract UsualMIntegrationTests is TestBase {
         // Fast forward 90 days in the future to generate yield
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
-        yield += _wrappedM.accruedYieldOf(address(_usualM));
+        yield += _wrappedM.accruedYieldOf(address(_wMXL));
 
         // Explicitly claim yield for UsualM
-        _wrappedM.claimFor(address(_usualM));
+        _wrappedM.claimFor(address(_wMXL));
 
-        assertEq(_wrappedM.accruedYieldOf(address(_usualM)), 0);
+        assertEq(_wrappedM.accruedYieldOf(address(_wMXL)), 0);
         assertEq(_wrappedM.balanceOf(_treasury), yield);
     }
 
@@ -96,28 +96,28 @@ contract UsualMIntegrationTests is TestBase {
 
         _wrapWithPermitVRS(_alice, _aliceKey, _alice, 5e6, 0, block.timestamp);
 
-        assertEq(_usualM.balanceOf(_alice), 5e6);
+        assertEq(_wMXL.balanceOf(_alice), 5e6);
         assertEq(_wrappedM.balanceOf(_alice), 5e6);
 
         _wrapWithPermitVRS(_alice, _aliceKey, _alice, 5e6, 1, block.timestamp);
 
-        assertEq(_usualM.balanceOf(_alice), 10e6);
+        assertEq(_wMXL.balanceOf(_alice), 10e6);
         assertEq(_wrappedM.balanceOf(_alice), 0);
     }
 
     function test_upgrade() external {
-        address usualMV2 = address(new UsualMV2());
+        address wMXLV2Address = address(new wMXLV2());
 
-        address proxyAdmin = _getAdminAddress(address(_usualM));
+        address proxyAdmin = _getAdminAddress(address(_wMXL));
 
         vm.prank(_admin);
         ProxyAdmin(proxyAdmin).upgradeAndCall(
-            ITransparentUpgradeableProxy(address(_usualM)),
-            usualMV2,
+            ITransparentUpgradeableProxy(address(_wMXL)),
+            wMXLV2Address,
             abi.encodeWithSelector(V2.initializeV2Test.selector)
         );
 
-        assertEq(V2(address(_usualM)).version(), 2);
+        assertEq(V2(address(_wMXL)).version(), 2);
     }
 
     function _getAdminAddress(address proxy) internal view returns (address) {

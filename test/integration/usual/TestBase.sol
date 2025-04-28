@@ -8,13 +8,13 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
-import { IWrappedMLike } from "../../../src/usual/interfaces/IWrappedMLike.sol";
-import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
-import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
+import { IWrappedMLike } from "../../../src/wmxl/interfaces/IWrappedMLike.sol";
+import { IwMXL } from "../../../src/wmxl/interfaces/IwMXL.sol";
+import { IRegistryAccess } from "../../../src/wmxl/interfaces/IRegistryAccess.sol";
 
-import { UsualM } from "../../../src/usual/UsualM.sol";
+import { wMXL } from "../../../src/wmxl/wMXL.sol";
 
-import { USUAL_M_UNWRAP, USUAL_M_PAUSE, USUAL_M_UNPAUSE, USUAL_M_MINTCAP_ALLOCATOR } from "../../../src/usual/constants.sol";
+import { WMXL_UNWRAP, WMXL_PAUSE, WMXL_UNPAUSE, WMXL_MINTCAP_ALLOCATOR } from "../../../src/wmxl/constants.sol";
 
 contract TestBase is Test {
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
@@ -41,8 +41,8 @@ contract TestBase is Test {
 
     address[] internal _accounts = [_alice, _bob, _carol];
 
-    address internal _usualMImplementation;
-    IUsualM internal _usualM;
+    address internal _wMXLImplementation;
+    IwMXL internal _wMXL;
 
     function _addToList(bytes32 list_, address account_) internal {
         vm.prank(_standardGovernor);
@@ -65,10 +65,10 @@ contract TestBase is Test {
 
     function _wrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _wrappedM.approve(address(_usualM), amount_);
+        _wrappedM.approve(address(_wMXL), amount_);
 
         vm.prank(account_);
-        _usualM.wrap(recipient_, amount_);
+        _wMXL.wrap(recipient_, amount_);
     }
 
     function _wrapWithPermitVRS(
@@ -82,12 +82,12 @@ contract TestBase is Test {
         (uint8 v_, bytes32 r_, bytes32 s_) = _getPermit(account_, signerPrivateKey_, amount_, nonce_, deadline_);
 
         vm.prank(account_);
-        _usualM.wrapWithPermit(recipient_, amount_, deadline_, v_, r_, s_);
+        _wMXL.wrapWithPermit(recipient_, amount_, deadline_, v_, r_, s_);
     }
 
     function _unwrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _usualM.unwrap(recipient_, amount_);
+        _wMXL.unwrap(recipient_, amount_);
     }
 
     function _set(bytes32 key_, bytes32 value_) internal {
@@ -100,13 +100,13 @@ contract TestBase is Test {
     }
 
     function _deployComponents() internal {
-        _usualMImplementation = address(new UsualM());
-        bytes memory usualMData = abi.encodeWithSignature(
+        _wMXLImplementation = address(new wMXL());
+        bytes memory wMXLData = abi.encodeWithSignature(
             "initialize(address,address)",
             address(_wrappedM),
             _registryAccess
         );
-        _usualM = IUsualM(address(new TransparentUpgradeableProxy(_usualMImplementation, _admin, usualMData)));
+        _wMXL = IwMXL(address(new TransparentUpgradeableProxy(_wMXLImplementation, _admin, wMXLData)));
     }
 
     function _fundAccounts() internal {
@@ -118,17 +118,17 @@ contract TestBase is Test {
 
     function _grantRoles() internal {
         vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(USUAL_M_PAUSE, _admin);
+        IRegistryAccess(_registryAccess).grantRole(WMXL_PAUSE, _admin);
         vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(USUAL_M_UNPAUSE, _admin);
+        IRegistryAccess(_registryAccess).grantRole(WMXL_UNPAUSE, _admin);
 
         for (uint256 i = 0; i < _accounts.length; ++i) {
             vm.prank(_admin);
-            IRegistryAccess(_registryAccess).grantRole(USUAL_M_UNWRAP, _accounts[i]);
+            IRegistryAccess(_registryAccess).grantRole(WMXL_UNWRAP, _accounts[i]);
         }
 
         vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(USUAL_M_MINTCAP_ALLOCATOR, _admin);
+        IRegistryAccess(_registryAccess).grantRole(WMXL_MINTCAP_ALLOCATOR, _admin);
     }
 
     /* ============ utils ============ */
@@ -155,7 +155,7 @@ contract TestBase is Test {
                             abi.encode(
                                 _wrappedM.PERMIT_TYPEHASH(),
                                 account_,
-                                address(_usualM),
+                                address(_wMXL),
                                 amount_,
                                 nonce_,
                                 deadline_
