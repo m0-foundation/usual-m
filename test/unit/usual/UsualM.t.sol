@@ -88,8 +88,8 @@ contract wMXLUnitTests is Test {
     function test_init() external view {
         assertEq(_wMXL.wrappedM(), address(_wrappedM));
         assertEq(_wMXL.registryAccess(), address(_registryAccess));
-        assertEq(_wMXL.name(), "wMXL");
-        assertEq(_wMXL.symbol(), "WMXL");
+        assertEq(_wMXL.name(), "Last Wrapped M");
+        assertEq(_wMXL.symbol(), "wMXL");
         assertEq(_wMXL.decimals(), 6);
     }
 

@@ -38,38 +38,41 @@ contract NAVProxyMPriceFeedUnitTests is Test {
     }
 
     function test_getRoundData() external {
-        mockNavOracle.setRoundData(1, 2e8, block.timestamp - 100, block.timestamp, 1);
+        uint256 currentTimestamp = block.timestamp;
+        mockNavOracle.setRoundData(1, 2e8, currentTimestamp > 100 ? currentTimestamp - 100 : 0, currentTimestamp, 1);
         (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = priceFeed
             .getRoundData(1);
 
         assertEq(roundId, 1);
         assertEq(answer, 1e8); // Threshold applied
-        assertEq(startedAt, block.timestamp - 100);
-        assertEq(updatedAt, block.timestamp);
+        assertEq(startedAt, currentTimestamp > 100 ? currentTimestamp - 100 : 0);
+        assertEq(updatedAt, currentTimestamp);
         assertEq(answeredInRound, 1);
     }
 
     function test_latestRoundData_belowThreshold() external {
-        mockNavOracle.setRoundData(2, 5e7, block.timestamp - 50, block.timestamp, 2);
+        uint256 currentTimestamp = block.timestamp;
+        mockNavOracle.setRoundData(2, 5e7, currentTimestamp > 50 ? currentTimestamp - 50 : 0, currentTimestamp, 2);
         (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = priceFeed
             .latestRoundData();
 
         assertEq(roundId, 2);
         assertEq(answer, 5e7); // No threshold applied
-        assertEq(startedAt, block.timestamp - 50);
-        assertEq(updatedAt, block.timestamp);
+        assertEq(startedAt, currentTimestamp > 50 ? currentTimestamp - 50 : 0);
+        assertEq(updatedAt, currentTimestamp);
         assertEq(answeredInRound, 2);
     }
 
     function test_latestRoundData_aboveThreshold() external {
-        mockNavOracle.setRoundData(3, 1.5e8, block.timestamp - 30, block.timestamp, 3);
+        uint256 currentTimestamp = block.timestamp;
+        mockNavOracle.setRoundData(3, 1.5e8, currentTimestamp > 30 ? currentTimestamp - 30 : 0, currentTimestamp, 3);
         (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound) = priceFeed
             .latestRoundData();
 
         assertEq(roundId, 3);
         assertEq(answer, 1e8); // Threshold applied
-        assertEq(startedAt, block.timestamp - 30);
-        assertEq(updatedAt, block.timestamp);
+        assertEq(startedAt, currentTimestamp > 30 ? currentTimestamp - 30 : 0);
+        assertEq(updatedAt, currentTimestamp);
         assertEq(answeredInRound, 3);
     }
 

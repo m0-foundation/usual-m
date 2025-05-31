@@ -75,9 +75,9 @@ contract wMXL is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IwMXL {
         if (wrappedM_ == address(0)) revert ZeroWrappedM();
         if (registryAccess_ == address(0)) revert ZeroRegistryAccess();
 
-        __ERC20_init("UsualM", "USUALM");
+        __ERC20_init("Last Wrapped M", "wMXL");
         __ERC20Pausable_init();
-        __ERC20Permit_init("UsualM");
+        __ERC20Permit_init("Last Wrapped M");
 
         UsualMStorageV0 storage $ = _usualMStorageV0();
         $.wrappedM = wrappedM_;
