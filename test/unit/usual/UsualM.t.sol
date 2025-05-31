@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
-import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import { Test, console2 } from "forge-std/Test.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
-import { MockWrappedM, MockRegistryAccess } from "../../utils/Mocks.sol";
+import { MockWrappedM, MockRegistryAccess } from "test/utils/Mocks.sol";
 
 import {
     DEFAULT_ADMIN_ROLE,

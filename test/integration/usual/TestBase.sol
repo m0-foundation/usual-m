@@ -5,7 +5,7 @@ pragma solidity 0.8.26;
 import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
 import {
     TransparentUpgradeableProxy
-} from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
 import { IWrappedMLike } from "../../../src/wmxl/interfaces/IWrappedMLike.sol";
