@@ -20,14 +20,11 @@ import {
     USUAL_M_UNWRAP,
     USUAL_M_PAUSE,
     USUAL_M_UNPAUSE,
-    USUAL_M_MINTCAP_ALLOCATOR,
-    USUAL_M_YIELD_RECIPIENT_SETTER
+    USUAL_M_MINTCAP_ALLOCATOR
 } from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
     uint256 public mainnetFork;
-
-    uint56 internal constant EXP_SCALED_ONE = 1e12;
 
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
     address internal constant _registrar = 0x119FbeeDD4F4f4298Fb59B720d5654442b81ae2c;
@@ -40,27 +37,21 @@ contract TestBase is Test {
     // Large WrappedM holder on Ethereum Mainnet
     address internal constant _wrappedMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
 
-    IMTokenLike internal constant _mToken = IMTokenLike(0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b);
-
     IRegistryAccess internal constant _registryAccess = IRegistryAccess(0x0D374775E962c3608B8F0A4b8B10567DF739bb56);
 
-    address internal _admin;
+    address internal _admin = _registryAccess.defaultAdmin();
     address internal _treasury = makeAddr("treasury");
 
     address internal _alice = makeAddr("alice");
     address internal _bob = makeAddr("bob");
     address internal _carol = makeAddr("carol");
 
-    address internal _earner = makeAddr("earner");
-    address internal _nonEarner = makeAddr("nonEarner");
-
     uint256 internal _aliceKey = _makeKey("alice");
 
-    address[] internal _accounts = [_alice, _bob, _carol, _earner, _nonEarner];
+    address[] internal _accounts = [_alice, _bob, _carol];
 
     address internal _usualMImplementation;
     IUsualM internal _usualM;
-    IUsualMV2 internal _usualMV2;
 
     function _addToList(bytes32 list_, address account_) internal {
         vm.prank(_standardGovernor);
@@ -72,7 +63,7 @@ contract TestBase is Test {
         IRegistrarLike(_registrar).removeFromList(list_, account_);
     }
 
-    function _giveWrappedMToken(address account_, uint256 amount_) internal {
+    function _giveWrappedM(address account_, uint256 amount_) internal {
         vm.prank(_wrappedMSource);
         _wrappedM.transfer(account_, amount_);
     }
@@ -126,13 +117,12 @@ contract TestBase is Test {
             _registryAccess
         );
 
-        _admin = _registryAccess.defaultAdmin();
         _usualM = IUsualM(address(new TransparentUpgradeableProxy(_usualMImplementation, _admin, usualMData)));
     }
 
     function _fundAccounts() internal {
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _giveWrappedMToken(_accounts[i], 10e6);
+            _giveWrappedM(_accounts[i], 10e6);
             _giveEth(_accounts[i], 0.1 ether);
         }
     }
@@ -150,9 +140,6 @@ contract TestBase is Test {
 
         vm.prank(_admin);
         IRegistryAccess(_registryAccess).grantRole(USUAL_M_MINTCAP_ALLOCATOR, _admin);
-
-        vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(USUAL_M_YIELD_RECIPIENT_SETTER, _admin);
     }
 
     /* ============ utils ============ */
