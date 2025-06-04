@@ -57,6 +57,13 @@ interface IWrappedMLike {
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool success);
 
     /**
+     * @notice Unwraps all the wM from the caller into M for `recipient`.
+     * @param  recipient The account receiving the withdrawn M.
+     * @return unwrapped The amount of M withdrawn.
+     */
+    function unwrap(address recipient) external returns (uint240 unwrapped);
+
+    /**
      * @notice Starts earning for `account` if allowed by the Registrar.
      * @param  account The account to start earning for.
      */

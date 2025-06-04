@@ -56,6 +56,60 @@ contract MockMToken {
     function stopEarning() external {
         isEarning[msg.sender] = false;
     }
+
+    function stopEarning(address account) external {
+        isEarning[account] = false;
+    }
+}
+
+contract MockWrappedM {
+    mapping(address account => uint256 balance) public balanceOf;
+    mapping(address account => address claimRecipient) public claimRecipient;
+    mapping(address account => uint256 yield) public yieldOf;
+
+    function claimFor(address account) external returns (uint240 yield) {
+        balanceOf[claimRecipient[account]] += yieldOf[account];
+    }
+
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {}
+
+    function transfer(address recipient, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[recipient] += amount;
+
+        return true;
+    }
+
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool) {
+        balanceOf[sender] -= amount;
+        balanceOf[recipient] += amount;
+
+        return true;
+    }
+
+    function setBalanceOf(address account, uint256 balance) external {
+        balanceOf[account] = balance;
+    }
+
+    function setClaimRecipient(address account, address recipient) external {
+        claimRecipient[account] = recipient;
+    }
+
+    function setYieldOf(address account, uint256 balance) external {
+        yieldOf[account] = balance;
+    }
+
+    function unwrap(address account) external returns (uint256) {
+        delete balanceOf[account];
+    }
 }
 
 contract MockRegistryAccess {

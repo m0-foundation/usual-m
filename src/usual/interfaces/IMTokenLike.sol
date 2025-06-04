@@ -58,8 +58,12 @@ interface IMTokenLike {
     /// @notice Starts earning for caller if allowed by TTG.
     function startEarning() external;
 
-    /// @notice Stops earning for caller.
-    function stopEarning() external;
+    /**
+     * @notice Stops earning for `account`.
+     * @dev    MUST revert if `account` is an approved earner in TTG Registrar.
+     * @param  account The account to stop earning for.
+     */
+    function stopEarning(address account) external;
 
     /* ============ View/Pure Functions ============ */
 

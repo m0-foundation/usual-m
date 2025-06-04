@@ -7,10 +7,10 @@ import {
 } from "../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 /**
- * @title  Usual WrappedM Extension.
- * @author M^0 Labs
+ * @title  Usual M Extension V2 interface.
+ * @author M0 Labs
  */
-interface IUsualM is IERC20Metadata {
+interface IUsualMV2 is IERC20Metadata {
     /* ============ Events ============ */
 
     /// @notice Emitted when address is added to blacklist.
@@ -21,6 +21,20 @@ interface IUsualM is IERC20Metadata {
 
     /// @notice Emitted when mint cap is set.
     event MintCapSet(uint256 newMintCap);
+
+    /**
+     * @notice Emitted when this contract's excess M is claimed.
+     * @param  yield The amount of M yield claimed.
+     */
+    event YieldClaimed(uint256 yield);
+
+    /**
+     * @notice Emitted when the yield recipient is set.
+     * @param  newRecipient The address of the new yield recipient.
+     */
+    event YieldRecipientSet(address indexed newRecipient);
+
+    /* ============ Custom Errors ============ */
 
     /// @notice Emitted when token transfers/wraps are attempted by blacklisted account.
     error Blacklisted();
@@ -49,25 +63,35 @@ interface IUsualM is IERC20Metadata {
     /// @notice Emitted if `wrap` or `unwrap` amount is 0.
     error InvalidAmount();
 
+    /// @notice Emitted when M earning is disabled for UsualM.
+    error EarningIsDisabled();
+
+    /// @notice Emitted if no yield is available to claim.
+    error NoYield();
+
+    /// @notice Emitted if M Token is 0x0.
+    error ZeroMToken();
+
+    /// @notice Emitted in constructor if Yield Recipient is 0x0.
+    error ZeroYieldRecipient();
+
     /* ============ Interactive Functions ============ */
 
     /**
-     * @notice Wraps `amount` WrappedM from the caller into UsualM for `recipient`.
+     * @notice Wraps `amount` M from the caller into UsualM for `recipient`.
      * @param  recipient The account receiving the minted UsualM.
-     * @param  amount    The amount of WrappedM deposited.
-     * @return           The amount of UsualM minted.
+     * @param  amount    The amount of M deposited.
      */
-    function wrap(address recipient, uint256 amount) external returns (uint256);
+    function wrap(address recipient, uint256 amount) external;
 
     /**
-     * @notice Wraps `amount` WrappedM from the caller into UsualM for `recipient`, using a permit.
+     * @notice Wraps `amount` M from the caller into UsualM for `recipient`, using a permit.
      * @param  recipient The account receiving the minted UsualM.
-     * @param  amount    The amount of WrappedM deposited.
+     * @param  amount    The amount of M deposited.
      * @param  deadline  The last timestamp where the signature is still valid.
      * @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  s         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-     * @return           The amount of UsualM minted.
      */
     function wrapWithPermit(
         address recipient,
@@ -76,16 +100,19 @@ interface IUsualM is IERC20Metadata {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external returns (uint256);
+    ) external;
 
     /**
-     * @notice Unwraps `amount` UsualM from the caller into WrappedM for `recipient`.
-     * @dev Can only be called by the `USUAL_M_UNWRAP`.
-     * @param  recipient The account receiving the withdrawn WrappedM.
+     * @notice Unwraps `amount` UsualM from the caller into M for `recipient`.
+     * @param  recipient The account receiving the withdrawn M.
      * @param  amount    The amount of UsualM burned.
-     * @return           The amount of WrappedM withdrawn.
      */
-    function unwrap(address recipient, uint256 amount) external returns (uint256);
+    function unwrap(address recipient, uint256 amount) external;
+
+    /// @notice Claims accrued yield to yield recipient.
+    function claimYield() external returns (uint256);
+
+    /* ============ Special Admin Functions ============ */
 
     /**
      * @notice Adds an address to the blacklist.
@@ -118,13 +145,26 @@ interface IUsualM is IERC20Metadata {
      **/
     function setMintCap(uint256 newMintCap) external;
 
+    /**
+     * @notice Disables earning of UsualM if disallowed by the TTG Registrar.
+     * @dev    Callable by anyone.
+     * @dev    Can only be called once and earning can not be re-enabled afterward.
+     */
+    function disableEarning() external;
+
+    /**
+     * @notice Sets the yield recipient.
+     * @dev    Only callable by the USUAL_M_YIELD_RECIPIENT_SETTER role.
+     * @dev    Reverts if account is 0x0.
+     * @dev    Rreturns early if the account is already the yield recipient.
+     * @param  account The address of the new yield recipient.
+     */
+    function setYieldRecipient(address account) external;
+
     /* ============ View/Pure Functions ============ */
 
     /// @notice Returns whether the account is blacklisted.
     function isBlacklisted(address account) external view returns (bool);
-
-    /// @notice Returns the WrappedM Token address.
-    function wrappedM() external view returns (address);
 
     /// @notice Returns the Registry Access address.
     function registryAccess() external view returns (address);
@@ -134,4 +174,16 @@ interface IUsualM is IERC20Metadata {
 
     /// @notice Returns the available wrappable amount for the current values of `mintCap` and `totalSupply`.
     function getWrappableAmount(uint256 amount) external view returns (uint256);
+
+    /// @notice Whether UsualM is earning M.
+    function isEarningEnabled() external view returns (bool);
+
+    /// @notice Returns the M token address.
+    function mToken() external view returns (address);
+
+    /// @notice The amount of accrued yield.
+    function yield() external view returns (uint256);
+
+    /// @notice The address of the yield recipient.
+    function yieldRecipient() external view returns (address);
 }
