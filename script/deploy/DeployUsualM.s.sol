@@ -2,13 +2,13 @@
 
 pragma solidity 0.8.26;
 
-import { Script, console2 } from "../lib/forge-std/src/Script.sol";
+import { Script, console2 } from "../../lib/forge-std/src/Script.sol";
 
-import { UsualM } from "../src/usual/UsualM.sol";
+import { UsualM } from "../../src/usual/UsualM.sol";
 
 import {
     TransparentUpgradeableProxy
-} from "../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+} from "../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract DeployUsualMScript is Script {
     address internal constant _WRAPPED_M_TOKEN = 0x437cc33344a0B27A429f795ff6B469C72698B291; // Mainnet Wrapped M

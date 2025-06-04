@@ -9,7 +9,9 @@ import {
 
 import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
 import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
+import { IWrappedMLike } from "../../../src/usual/interfaces/IWrappedMLike.sol";
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
+import { IUsualMV2 } from "../../../src/usual/interfaces/IUsualMV2.sol";
 import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
 
 import { UsualM } from "../../../src/usual/UsualM.sol";
@@ -19,9 +21,7 @@ import {
     USUAL_M_PAUSE,
     USUAL_M_UNPAUSE,
     USUAL_M_MINTCAP_ALLOCATOR,
-    M_ENABLE_EARNING,
-    M_DISABLE_EARNING,
-    M_CLAIM_EXCESS
+    USUAL_M_YIELD_RECIPIENT_SETTER
 } from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
@@ -35,14 +35,16 @@ contract TestBase is Test {
     bytes32 internal constant _EARNERS_LIST = "earners";
     bytes32 internal constant _CLAIM_OVERRIDE_RECIPIENT_PREFIX = "wm_claim_override_recipient";
 
+    IWrappedMLike internal constant _wrappedM = IWrappedMLike(0x437cc33344a0B27A429f795ff6B469C72698B291);
+
+    // Large WrappedM holder on Ethereum Mainnet
+    address internal constant _wrappedMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
+
     IMTokenLike internal constant _mToken = IMTokenLike(0x866A2BF4E572CbcF37D5071A7a58503Bfb36be1b);
 
-    // Large MToken holder on Ethereum Mainnet
-    address internal constant _mTokenSource = 0x3f0376da3Ae4313E7a5F1dA184BAFC716252d759;
-
     IRegistryAccess internal constant _registryAccess = IRegistryAccess(0x0D374775E962c3608B8F0A4b8B10567DF739bb56);
-    address internal _admin;
 
+    address internal _admin;
     address internal _treasury = makeAddr("treasury");
 
     address internal _alice = makeAddr("alice");
@@ -58,6 +60,7 @@ contract TestBase is Test {
 
     address internal _usualMImplementation;
     IUsualM internal _usualM;
+    IUsualMV2 internal _usualMV2;
 
     function _addToList(bytes32 list_, address account_) internal {
         vm.prank(_standardGovernor);
@@ -69,23 +72,18 @@ contract TestBase is Test {
         IRegistrarLike(_registrar).removeFromList(list_, account_);
     }
 
-    function _giveMToken(address account_, uint256 amount_) internal {
-        vm.prank(_mTokenSource);
-        _mToken.transfer(account_, amount_);
+    function _giveWrappedMToken(address account_, uint256 amount_) internal {
+        vm.prank(_wrappedMSource);
+        _wrappedM.transfer(account_, amount_);
     }
 
     function _giveEth(address account_, uint256 amount_) internal {
         vm.deal(account_, amount_);
     }
 
-    function _startEarningM(address account_) internal {
-        vm.prank(account_);
-        _mToken.startEarning();
-    }
-
     function _wrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _mToken.approve(address(_usualM), amount_);
+        _wrappedM.approve(address(_usualM), amount_);
 
         vm.prank(account_);
         _usualM.wrap(recipient_, amount_);
@@ -119,17 +117,12 @@ contract TestBase is Test {
         _set(keccak256(abi.encode(_CLAIM_OVERRIDE_RECIPIENT_PREFIX, account_)), bytes32(uint256(uint160(recipient_))));
     }
 
-    function _setMintCap(uint256 newMintCap_) internal {
-        vm.prank(_admin);
-        _usualM.setMintCap(newMintCap_);
-    }
-
     function _deployComponents() internal {
         _usualMImplementation = address(new UsualM());
 
         bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
-            address(_mToken),
+            address(_wrappedM),
             _registryAccess
         );
 
@@ -139,7 +132,7 @@ contract TestBase is Test {
 
     function _fundAccounts() internal {
         for (uint256 i = 0; i < _accounts.length; ++i) {
-            _giveMToken(_accounts[i], 10e6);
+            _giveWrappedMToken(_accounts[i], 10e6);
             _giveEth(_accounts[i], 0.1 ether);
         }
     }
@@ -159,34 +152,10 @@ contract TestBase is Test {
         IRegistryAccess(_registryAccess).grantRole(USUAL_M_MINTCAP_ALLOCATOR, _admin);
 
         vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(M_ENABLE_EARNING, _admin);
-
-        vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(M_DISABLE_EARNING, _admin);
-
-        vm.prank(_admin);
-        IRegistryAccess(_registryAccess).grantRole(M_CLAIM_EXCESS, _admin);
-    }
-
-    /* ============ mock calls ============ */
-
-    function _mockCurrentMIndex(uint128 mIndex_) internal {
-        bytes[] memory mocks_ = new bytes[](1);
-        mocks_[0] = abi.encode(mIndex_);
-
-        vm.mockCalls(address(_mToken), abi.encodeWithSelector(IMTokenLike.currentIndex.selector), mocks_);
+        IRegistryAccess(_registryAccess).grantRole(USUAL_M_YIELD_RECIPIENT_SETTER, _admin);
     }
 
     /* ============ utils ============ */
-
-    /// @dev Helper to get the M balance of account_ if account_ is not an earner,
-    ///      otherwise, get the balance of account_ at mIndex_.
-    function _getMBalanceOf(address account_, uint128 mIndex_) internal view returns (uint256) {
-        return
-            _mToken.isEarning(account_)
-                ? (_mToken.principalBalanceOf(account_) * mIndex_) / EXP_SCALED_ONE
-                : _mToken.balanceOf(account_);
-    }
 
     function _makeKey(string memory name_) internal returns (uint256 key_) {
         (, key_) = makeAddrAndKey(name_);
@@ -205,10 +174,10 @@ contract TestBase is Test {
                 keccak256(
                     abi.encodePacked(
                         "\x19\x01",
-                        _mToken.DOMAIN_SEPARATOR(),
+                        _wrappedM.DOMAIN_SEPARATOR(),
                         keccak256(
                             abi.encode(
-                                _mToken.PERMIT_TYPEHASH(),
+                                _wrappedM.PERMIT_TYPEHASH(),
                                 account_,
                                 address(_usualM),
                                 amount_,
