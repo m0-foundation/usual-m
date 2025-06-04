@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pragma solidity 0.8.26;
-import { console } from "../../lib/forge-std/src/console.sol";
-import { IndexingMath } from "../../lib/common/src/libs/IndexingMath.sol";
-import { UIntMath } from "../../lib/common/src/libs/UIntMath.sol";
 
 import {
     ERC20PausableUpgradeable

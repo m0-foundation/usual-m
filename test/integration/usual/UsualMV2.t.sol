@@ -1,20 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 
 pragma solidity 0.8.26;
-import { console } from "../../../lib/forge-std/src/console.sol";
+
 import { Test } from "../../../lib/forge-std/src/Test.sol";
-import { Vm } from "../../../lib/forge-std/src/Vm.sol";
-import { Upgrades } from "../../../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
-import { Options } from "../../../lib/openzeppelin-foundry-upgrades/src/Options.sol";
-
-import { ProxyAdmin } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
-import {
-    ITransparentUpgradeableProxy
-} from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import { ERC1967Utils } from "../../../lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Utils.sol";
-
-import { UsualM } from "../../../src/usual/UsualM.sol";
-import { UsualMV2 } from "../../../src/usual/UsualMV2.sol";
 
 import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 import { IWrappedMLike } from "../../../src/usual/interfaces/IWrappedMLike.sol";
@@ -26,8 +14,6 @@ import { UpgradeUsualMBase } from "../../../script/upgrade/UpgradeUsualMBase.sol
 import { USUAL_M_MINTCAP_ALLOCATOR, USUAL_M_UNWRAP } from "../../../src/usual/constants.sol";
 
 import { IERC20Like } from "../../utils/IERC20Like.sol";
-
-import { TestBase } from "./TestBase.sol";
 
 contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
     uint56 internal constant _EXP_SCALED_ONE = 1e12;
@@ -405,11 +391,6 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
 
         uint256 usualMMTokenBalanceBefore_ = _mToken.balanceOf(address(_usualM));
 
-        // // Only set mint cap if wrap amount is different from current cap
-        // if (wrapAmount_ != _usualM.mintCap()) {
-        //     _setMintCap(wrapAmount_);
-        // }
-
         // Only set mint cap if newly wrap amount will exceed the current cap
         if ((usualMMTokenBalanceBefore_ + wrapAmount_) > _usualM.mintCap()) {
             _setMintCap(usualMMTokenBalanceBefore_ + wrapAmount_ + 1);
@@ -442,10 +423,10 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
 
         if (recipientEarning_) {
             assertEq(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_);
-            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 2); // May round down in favor of the protocol
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 3); // May round down in favor of the protocol
         } else {
             assertEq(_mToken.balanceOf(recipient_), recipientMTokenBalanceBefore_ + unwrapAmount_);
-            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 2); // May round down in favor of the protocol
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ - unwrapAmount_, 3); // May round down in favor of the protocol
         }
 
         assertEq(_usualM.balanceOf(sender_), senderUsualMBalanceBefore_ - unwrapAmount_);

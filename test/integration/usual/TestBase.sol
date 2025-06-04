@@ -2,16 +2,14 @@
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
+import { Test } from "../../../lib/forge-std/src/Test.sol";
 import {
     TransparentUpgradeableProxy
 } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
-import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 import { IWrappedMLike } from "../../../src/usual/interfaces/IWrappedMLike.sol";
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
-import { IUsualMV2 } from "../../../src/usual/interfaces/IUsualMV2.sol";
 import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
 
 import { UsualM } from "../../../src/usual/UsualM.sol";
