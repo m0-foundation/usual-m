@@ -79,6 +79,7 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
     /* ============ Initializer ============ */
 
     /**
+     * @custom:oz-upgrades-validate-as-initializer
      * @notice Initializes the UsualMV2 contract.
      * @param  mToken_         The address of the M token.
      * @param  yieldRecipient_ The address of a yield destination.

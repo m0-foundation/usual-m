@@ -24,20 +24,32 @@ abstract contract UpgradeUsualMBase is Script {
         Options memory opts;
         opts.unsafeAllow = "missing-initializer";
 
-        Upgrades.upgradeProxy(
-            _USUAL_M_PROXY,
-            "UsualMV2.sol:UsualMV2",
-            abi.encodeCall(UsualMV2.initializeV2, (_M_TOKEN, _USUAL_M_YIELD_RECIPIENT)),
-            opts,
-            proxyAdmin
-        );
+        Upgrades.upgradeProxy(_USUAL_M_PROXY, "UsualMV2.sol:UsualMV2", _getInitializeV2Calldata(), opts, proxyAdmin);
+    }
+
+    /// @dev Deploys the new UsualMV2 implementation and returns its address.
+    function _prepareUsualMUpgrade() internal returns (address) {
+        Options memory opts;
+        opts.unsafeAllow = "missing-initializer";
+
+        return Upgrades.prepareUpgrade("UsualMV2.sol:UsualMV2", opts);
     }
 
     function _getAdminAddress(address proxy) internal view returns (address) {
-        address CHEATCODE_ADDRESS = 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D;
-        Vm vm = Vm(CHEATCODE_ADDRESS);
+        return Upgrades.getAdminAddress(proxy);
+    }
 
-        bytes32 adminSlot = vm.load(proxy, ERC1967Utils.ADMIN_SLOT);
-        return address(uint160(uint256(adminSlot)));
+    function _getInitializeV2Calldata() internal pure returns (bytes memory) {
+        return abi.encodeCall(UsualMV2.initializeV2, (_M_TOKEN, _USUAL_M_YIELD_RECIPIENT));
+    }
+
+    function _getUpgradeAndCallCalldata(address implementation) internal pure returns (bytes memory) {
+        return
+            abi.encodeWithSignature(
+                "upgradeAndCall(address,address,bytes)",
+                _USUAL_M_PROXY,
+                implementation,
+                _getInitializeV2Calldata()
+            );
     }
 }
