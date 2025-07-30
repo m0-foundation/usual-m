@@ -58,6 +58,10 @@ contract UsualMV2UpgradeIntegrationTests is Test, UpgradeUsualMBase {
         assertEq(_usualM.registryAccess(), _USUAL_REGISTRY_ACCESS);
         assertEq(_usualM.mToken(), _M_TOKEN);
         assertEq(_usualM.yieldRecipient(), _USUAL_M_YIELD_RECIPIENT);
+
+        // Check balances after unwrapping
+        assertApproxEqAbs(_mToken.balanceOf(_USUAL_M_PROXY), _wrappedMTokenBalanceBeforeUpgrade, 1); // May round down on unwrap
+        assertEq(_wrappedM.balanceOf(_USUAL_M_PROXY), 0);
     }
 
     function test_upgradeViaProxyAdmin_calldata() external {
@@ -75,5 +79,8 @@ contract UsualMV2UpgradeIntegrationTests is Test, UpgradeUsualMBase {
         assertEq(_usualM.registryAccess(), _USUAL_REGISTRY_ACCESS);
         assertEq(_usualM.mToken(), _M_TOKEN);
         assertEq(_usualM.yieldRecipient(), _USUAL_M_YIELD_RECIPIENT);
+
+        assertApproxEqAbs(_mToken.balanceOf(_USUAL_M_PROXY), _wrappedMTokenBalanceBeforeUpgrade, 1); // May round down on unwrap
+        assertEq(_wrappedM.balanceOf(_USUAL_M_PROXY), 0);
     }
 }
