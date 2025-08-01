@@ -129,10 +129,8 @@ contract UsualMV2UnitTests is Test {
 
     /* ============ claimYield ============ */
     function test_claimYield_noYield() external {
-        vm.expectRevert(IUsualMV2.NoYield.selector);
-
         vm.prank(_alice);
-        _usualMV2.claimYield();
+        assertEq(_usualMV2.claimYield(), 0);
     }
 
     function test_claimYield() external {

@@ -116,7 +116,7 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
     function claimYield() external returns (uint256) {
         uint256 yield_ = yield();
 
-        if (yield_ == 0) revert NoYield();
+        if (yield_ == 0) return 0;
 
         emit YieldClaimed(yield_);
 
