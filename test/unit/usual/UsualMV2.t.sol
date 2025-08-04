@@ -160,7 +160,7 @@ contract UsualMV2UnitTests is Test {
     /* ============ wrap ============ */
     function test_wrap_wholeBalance() external {
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
 
         assertEq(_mToken.balanceOf(_alice), 0);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 10e6);
@@ -170,7 +170,7 @@ contract UsualMV2UnitTests is Test {
 
     function test_wrap() external {
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 5e6);
+        assertEq(_usualMV2.wrap(_alice, 5e6), 5e6);
 
         assertEq(_mToken.balanceOf(_alice), 5e6);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 5e6);
@@ -180,7 +180,7 @@ contract UsualMV2UnitTests is Test {
 
     function test_wrapWithPermit() external {
         vm.prank(_bob);
-        _usualMV2.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0));
+        assertEq(_usualMV2.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0)), 5e6);
 
         assertEq(_mToken.balanceOf(_alice), 10e6);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 5e6);
@@ -212,11 +212,11 @@ contract UsualMV2UnitTests is Test {
 
         // First wrap should succeed
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
 
         // Second wrap should succeed (within cap)
         vm.prank(_bob);
-        _usualMV2.wrap(_bob, 5e6);
+        assertEq(_usualMV2.wrap(_bob, 5e6), 5e6);
 
         // Third wrap should fail (exceeds cap)
         vm.expectRevert(IUsualMV2.MintCapExceeded.selector);
@@ -243,7 +243,7 @@ contract UsualMV2UnitTests is Test {
 
         // Wrap tokens up to the mint cap
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, wrapAmount);
+        assertEq(_usualMV2.wrap(_alice, wrapAmount), wrapAmount);
 
         // Check that the total supply does not exceed the mint cap
         assertLe(_usualMV2.totalSupply(), mintCap);
@@ -255,7 +255,7 @@ contract UsualMV2UnitTests is Test {
     /* ============ unwrap ============ */
     function test_unwrap() external {
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
 
         vm.prank(_alice);
         _usualMV2.unwrap(_alice, 5e6);
@@ -268,14 +268,14 @@ contract UsualMV2UnitTests is Test {
 
     function test_unwrap_wholeBalance() external {
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
 
         assertEq(_mToken.balanceOf(_alice), 0);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 10e6);
         assertEq(_usualMV2.balanceOf(_alice), 10e6);
 
         vm.prank(_alice);
-        _usualMV2.unwrap(_alice, 10e6);
+        assertEq(_usualMV2.unwrap(_alice, 10e6), 10e6);
 
         assertEq(_mToken.balanceOf(_alice), 10e6);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 0);
@@ -283,7 +283,7 @@ contract UsualMV2UnitTests is Test {
         assertEq(_usualMV2.balanceOf(_alice), 0);
     }
 
-    function test_unwarp_notAllowed() external {
+    function test_unwrap_notAllowed() external {
         vm.expectRevert(IUsualMV2.NotAuthorized.selector);
 
         vm.prank(_other);

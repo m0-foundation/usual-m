@@ -81,8 +81,9 @@ interface IUsualMV2 is IERC20Metadata {
      * @notice Wraps `amount` M from the caller into UsualM for `recipient`.
      * @param  recipient The account receiving the minted UsualM.
      * @param  amount    The amount of M deposited.
+     * @return The amount of UsualM minted.
      */
-    function wrap(address recipient, uint256 amount) external;
+    function wrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
      * @notice Wraps `amount` M from the caller into UsualM for `recipient`, using a permit.
@@ -92,6 +93,7 @@ interface IUsualMV2 is IERC20Metadata {
      * @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
      * @param  s         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
+     * @return The amount of UsualM minted.
      */
     function wrapWithPermit(
         address recipient,
@@ -100,14 +102,15 @@ interface IUsualMV2 is IERC20Metadata {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external;
+    ) external returns (uint256);
 
     /**
      * @notice Unwraps `amount` UsualM from the caller into M for `recipient`.
      * @param  recipient The account receiving the withdrawn M.
      * @param  amount    The amount of UsualM burned.
+     * @return The amount of WrappedM tokens withdrawn.
      */
-    function unwrap(address recipient, uint256 amount) external;
+    function unwrap(address recipient, uint256 amount) external returns (uint256);
 
     /// @notice Claims accrued yield to yield recipient.
     function claimYield() external returns (uint256);

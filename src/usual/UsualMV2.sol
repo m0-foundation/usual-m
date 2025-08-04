@@ -126,10 +126,10 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
     }
 
     /// @inheritdoc IUsualMV2
-    function wrap(address recipient, uint256 amount) external {
+    function wrap(address recipient, uint256 amount) external returns (uint256) {
         if (amount == 0) revert InvalidAmount();
 
-        _wrap(msg.sender, recipient, amount);
+        return _wrap(msg.sender, recipient, amount);
     }
 
     /// @inheritdoc IUsualMV2
@@ -140,18 +140,18 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {
+    ) external returns (uint256) {
         if (amount == 0) revert InvalidAmount();
 
         // NOTE: `permit` call failures can be safely ignored to remove the risk of transactions being reverted due to front-run.
         try IMTokenLike(mToken()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
 
-        _wrap(msg.sender, recipient, amount);
+        return _wrap(msg.sender, recipient, amount);
     }
 
     /// @inheritdoc IUsualMV2
-    function unwrap(address recipient, uint256 amount) external {
-        _unwrap(msg.sender, recipient, amount);
+    function unwrap(address recipient, uint256 amount) external returns (uint256) {
+        return _unwrap(msg.sender, recipient, amount);
     }
 
     /* ============ Special Admin Functions ============ */
@@ -310,8 +310,9 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
      * @param  account    The account from which M is deposited.
      * @param  recipient  The account receiving the minted UsualM.
      * @param  amount     The amount of M deposited.
+     * @return wrapped    The amount of UsualM minted.
      */
-    function _wrap(address account, address recipient, uint256 amount) internal {
+    function _wrap(address account, address recipient, uint256 amount) internal returns (uint256 wrapped) {
         // NOTE: The behavior of `IMTokenLike.transferFrom` is known, so its return can be ignored.
         IMTokenLike(mToken()).transferFrom(account, address(this), amount);
 
@@ -320,7 +321,7 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
         //                 0, 1, or XX extra wei may be locked in UsualM compared to the minted amount of UsualM token.
         //       Option 2: $M transfer from an $M non-earner to an $M earner (UsualM in earning state): precise $M transfer → rounds down,
         //                 0, -1, or -XX wei may be locked in UsualM compared to the minted amount of UsualM token.
-        _mint(recipient, amount);
+        _mint(recipient, wrapped = amount);
     }
 
     /**
@@ -328,8 +329,9 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
      * @param  account   The account from which UsualM is burned.
      * @param  recipient The account receiving the withdrawn M.
      * @param  amount    The amount of UsualM burned.
+     * @return unwrapped The amount of WrappedM tokens withdrawn.
      */
-    function _unwrap(address account, address recipient, uint256 amount) internal {
+    function _unwrap(address account, address recipient, uint256 amount) internal returns (uint256 unwrapped) {
         if (amount == 0) revert InvalidAmount();
 
         UsualMStorageV0 storage $ = _usualMStorageV0();
@@ -345,7 +347,7 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
         //       Option 1: $M transfer from an $M earner (UsualM in earning state) to another $M earner: rounds up → rounds up.
         //       Option 2: $M transfer from an $M earner (UsualM in earning state) to an $M non-earner: rounds up → precise $M transfer.
         //       In both cases, 0, 1, or XX extra wei may be deducted from the UsualM contract's $M balance compared to the burned amount of UsualM token.
-        IMTokenLike($.mToken).transfer(recipient, amount);
+        IMTokenLike($.mToken).transfer(recipient, unwrapped = amount);
     }
 
     /**
