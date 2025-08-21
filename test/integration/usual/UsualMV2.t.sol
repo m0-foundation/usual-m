@@ -3,17 +3,22 @@
 pragma solidity 0.8.26;
 
 import { Test } from "../../../lib/forge-std/src/Test.sol";
+import { IERC20 } from "../../../lib/forge-std/src/interfaces/IERC20.sol";
+
+import { IAccessControl } from "../../../lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 import { IMTokenLike } from "../../../src/usual/interfaces/IMTokenLike.sol";
 import { IWrappedMLike } from "../../../src/usual/interfaces/IWrappedMLike.sol";
 import { IUsualM } from "../../../src/usual/interfaces/IUsualM.sol";
 import { IUsualMV2 } from "../../../src/usual/interfaces/IUsualMV2.sol";
 import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.sol";
+import { ISwapFacilityLike } from "../../../src/usual/interfaces/ISwapFacilityLike.sol";
+
 import { UpgradeUsualMBase } from "../../../script/upgrade/UpgradeUsualMBase.sol";
 
 import { USUAL_M_MINTCAP_ALLOCATOR, USUAL_M_UNWRAP } from "../../../src/usual/constants.sol";
 
-import { IERC20Like } from "../../utils/IERC20Like.sol";
+import { IRegistrarLike } from "../../utils/IRegistrarLike.sol";
 
 contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
     uint56 internal constant _EXP_SCALED_ONE = 1e12;
@@ -24,6 +29,8 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
     address internal constant _WRAPPED_M_TOKEN = 0x437cc33344a0B27A429f795ff6B469C72698B291;
 
     IMTokenLike internal constant _mToken = IMTokenLike(_M_TOKEN);
+    IRegistrarLike internal constant _registrar = IRegistrarLike(0x119FbeeDD4F4f4298Fb59B720d5654442b81ae2c);
+    ISwapFacilityLike internal constant _swapFacility = ISwapFacilityLike(_SWAP_FACILITY);
     IWrappedMLike internal constant _wrappedM = IWrappedMLike(_WRAPPED_M_TOKEN);
 
     // Large MToken holder on Ethereum Mainnet
@@ -50,7 +57,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
     uint256 public mainnetFork;
 
     function setUp() external {
-        mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"), 22_625_475);
+        mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"), 23_170_985);
 
         _wrappedMTokenBalanceBeforeUpgrade = _wrappedM.balanceOf(_USUAL_M_PROXY);
 
@@ -79,6 +86,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         assertEq(_usualM.decimals(), 6);
         assertEq(_usualM.registryAccess(), _USUAL_REGISTRY_ACCESS);
         assertEq(_usualM.mToken(), _M_TOKEN);
+        assertEq(_usualM.swapFacility(), _SWAP_FACILITY);
         assertEq(_usualM.yieldRecipient(), _USUAL_M_YIELD_RECIPIENT);
     }
 
@@ -100,7 +108,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
         uint256 yield = _usualM.yield();
-        assertEq(yield, 666_301_404849);
+        assertEq(yield, 697_039_516965);
 
         // Check balances before unwrapping Usual M
         assertEq(_usualM.balanceOf(_alice), amount);
@@ -116,7 +124,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         assertEq(_usualM.balanceOf(_alice), 0);
         assertEq(_mToken.balanceOf(_alice), amount);
         assertEq(_mToken.balanceOf(_USUAL_M_YIELD_RECIPIENT), 0);
-        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalance -= amount);
+        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalance -= (amount + 1)); // Unwrap rounds down
         assertEq(_usualM.totalSupply(), usualMTotalSupply -= amount);
 
         _wrap(_bob, _bob, amount);
@@ -125,13 +133,16 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         vm.warp(vm.getBlockTimestamp() + 90 days);
 
         yield = _usualM.yield();
-        assertEq(yield, 1_339_323_220354);
+        assertEq(yield, 1_401_248_372289);
 
         // Check balances before claiming M
         assertEq(_usualM.balanceOf(_bob), amount);
         assertEq(_mToken.balanceOf(_bob), 0);
         assertEq(_mToken.balanceOf(_USUAL_M_YIELD_RECIPIENT), 0);
-        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalance += (1_339_323_220354 - 666_301_404849 + amount));
+        assertEq(
+            _mToken.balanceOf(address(_usualM)),
+            mTokenBalance += (1_401_248_372289 - 697_039_516965 + amount + 1)
+        );
         assertEq(_usualM.totalSupply(), usualMTotalSupply += amount);
 
         _usualM.claimYield();
@@ -197,18 +208,16 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         assertEq(_usualM.balanceOf(_earner), wrapAmount);
     }
 
-    function test_wrapWithPermits() external {
+    function test_wrapWithPermit() public {
         assertEq(_mToken.balanceOf(_alice), 10e6);
 
-        _wrapWithPermitVRS(_alice, _aliceKey, _alice, 5e6, 0, block.timestamp);
+        (uint8 v_, bytes32 r_, bytes32 s_) = _getPermit(_alice, _aliceKey, 5e6, 0, block.timestamp);
+
+        vm.prank(_alice);
+        _swapFacility.swapInMWithPermit(address(_usualM), 5e6, _alice, block.timestamp, v_, r_, s_);
 
         assertEq(_usualM.balanceOf(_alice), 5e6);
         assertEq(_mToken.balanceOf(_alice), 5e6);
-
-        _wrapWithPermitVRS(_alice, _aliceKey, _alice, 5e6, 1, block.timestamp);
-
-        assertEq(_usualM.balanceOf(_alice), 10e6);
-        assertEq(_mToken.balanceOf(_alice), 0);
     }
 
     function testFuzz_wrap(
@@ -248,7 +257,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         uint256 recipientUsualMBalanceBefore_ = _usualM.balanceOf(recipient_);
 
         vm.prank(sender_);
-        _mToken.approve(address(_usualM), wrapAmount_);
+        _mToken.approve(address(_swapFacility), wrapAmount_);
 
         if (wrapAmount_ == 0) {
             vm.expectRevert(abi.encodeWithSelector(IUsualM.InvalidAmount.selector));
@@ -256,20 +265,20 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
             vm.expectEmit();
 
             // UsualM tranfer/mint event
-            emit IERC20Like.Transfer(address(0), recipient_, wrapAmount_);
+            emit IERC20.Transfer(address(0), recipient_, wrapAmount_);
         }
 
         vm.prank(sender_);
-        _usualM.wrap(recipient_, wrapAmount_);
+        _swapFacility.swapInM(address(_usualM), wrapAmount_, recipient_);
 
         if (senderEarning_) {
             assertEq(_mToken.balanceOf(sender_), senderMTokenBalanceBefore_ - wrapAmount_);
-            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 1); // May round down in favor of the protocol
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 2); // May round down in favor of the protocol
 
             assertEq(_usualM.balanceOf(recipient_), recipientUsualMBalanceBefore_ + wrapAmount_);
         } else {
             assertEq(_mToken.balanceOf(sender_), senderMTokenBalanceBefore_ - wrapAmount_);
-            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 1); // May round down in favor of the protocol
+            assertApproxEqAbs(_mToken.balanceOf(address(_usualM)), usualMMTokenBalanceBefore_ + wrapAmount_, 2); // May round down in favor of the protocol
 
             assertEq(_usualM.balanceOf(recipient_), recipientUsualMBalanceBefore_ + wrapAmount_);
         }
@@ -293,7 +302,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         _unwrap(_earner, _earner, unwrapAmount_);
 
         assertEq(_mToken.balanceOf(_earner), 10e6);
-        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalanceOfUsualM_ -= unwrapAmount_);
+        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalanceOfUsualM_ -= (unwrapAmount_ + 1));
 
         assertEq(_usualM.balanceOf(_earner), 0);
     }
@@ -316,7 +325,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
 
         assertEq(_mToken.balanceOf(_earner), unwrapAmount_);
         assertEq(_mToken.balanceOf(_nonEarner), 15e6);
-        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalanceOfUsualM_ -= unwrapAmount_);
+        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalanceOfUsualM_ -= (unwrapAmount_ + 1));
 
         assertEq(_usualM.balanceOf(_earner), 0);
     }
@@ -356,7 +365,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
 
         assertEq(_mToken.balanceOf(_nonEarner), wrapAmount_);
         assertEq(_mToken.balanceOf(_earner), 10e6 + unwrapAmount_);
-        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalanceOfUsualM_ -= unwrapAmount_);
+        assertEq(_mToken.balanceOf(address(_usualM)), mTokenBalanceOfUsualM_ -= (unwrapAmount_ + 1));
 
         assertEq(_usualM.balanceOf(_nonEarner), 0);
         assertEq(_usualM.balanceOf(_earner), 0);
@@ -404,6 +413,12 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         uint256 senderUsualMBalanceBefore_ = _usualM.balanceOf(sender_);
         uint256 recipientMTokenBalanceBefore_ = _mToken.balanceOf(recipient_);
 
+        vm.expectEmit(address(_usualM));
+        emit IERC20.Approval(sender_, address(_swapFacility), unwrapAmount_);
+
+        vm.prank(sender_);
+        _usualM.approve(address(_swapFacility), unwrapAmount_);
+
         if (unwrapAmount_ == 0) {
             vm.expectRevert(abi.encodeWithSelector(IUsualM.InvalidAmount.selector));
         } else if (unwrapAmount_ > usualMMTokenBalanceBefore_) {
@@ -411,13 +426,14 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
             vm.expectRevert();
         } else {
             vm.expectEmit(address(_usualM));
-            emit IERC20Like.Transfer(address(sender_), address(0), unwrapAmount_); // UsualM burn event
+            emit IERC20.Transfer(address(_swapFacility), address(0), unwrapAmount_); // UsualM burn event
 
             vm.expectEmit(address(_mToken));
-            emit IERC20Like.Transfer(address(_usualM), recipient_, unwrapAmount_); // M token transfer event
+            emit IERC20.Transfer(address(_swapFacility), recipient_, unwrapAmount_); // M token transfer event
         }
 
-        _unwrap(sender_, recipient_, unwrapAmount_);
+        vm.prank(sender_);
+        _swapFacility.swapOutM(address(_usualM), unwrapAmount_, recipient_);
 
         if (unwrapAmount_ == 0 || unwrapAmount_ > usualMMTokenBalanceBefore_) return;
 
@@ -455,6 +471,11 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
 
     /* ============ utils ============ */
 
+    function _addToList(bytes32 list_, address account_) internal {
+        vm.prank(0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016); // Standard Governor
+        _registrar.addToList(list_, account_);
+    }
+
     /// @dev Helper to get the M balance of account_ if account_ is not an earner,
     ///      otherwise, get the balance of account_ at mIndex_.
     function _getMBalanceOf(address account_, uint128 mIndex_) internal view returns (uint256) {
@@ -480,6 +501,9 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
         for (uint256 i = 0; i < _accounts.length; ++i) {
             vm.prank(_USUAL_ADMIN);
             IRegistryAccess(_USUAL_REGISTRY_ACCESS).grantRole(USUAL_M_UNWRAP, _accounts[i]);
+
+            vm.prank(0xF2f1ACbe0BA726fEE8d75f3E32900526874740BB); // Swap Facility Admin
+            IAccessControl(address(_swapFacility)).grantRole(keccak256("M_SWAPPER_ROLE"), _accounts[i]);
         }
 
         vm.prank(_USUAL_ADMIN);
@@ -498,29 +522,18 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
 
     function _wrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _mToken.approve(address(_usualM), amount_);
+        _mToken.approve(address(_swapFacility), amount_);
 
         vm.prank(account_);
-        _usualM.wrap(recipient_, amount_);
+        _swapFacility.swapInM(address(_usualM), amount_, recipient_);
     }
 
     function _unwrap(address account_, address recipient_, uint256 amount_) internal {
         vm.prank(account_);
-        _usualM.unwrap(recipient_, amount_);
-    }
-
-    function _wrapWithPermitVRS(
-        address account_,
-        uint256 signerPrivateKey_,
-        address recipient_,
-        uint256 amount_,
-        uint256 nonce_,
-        uint256 deadline_
-    ) internal {
-        (uint8 v_, bytes32 r_, bytes32 s_) = _getPermit(account_, signerPrivateKey_, amount_, nonce_, deadline_);
+        _usualM.approve(address(_swapFacility), amount_);
 
         vm.prank(account_);
-        _usualM.wrapWithPermit(recipient_, amount_, deadline_, v_, r_, s_);
+        _swapFacility.swapOutM(address(_usualM), amount_, recipient_);
     }
 
     function _getPermit(
@@ -541,7 +554,7 @@ contract UsualMV2IntegrationTests is Test, UpgradeUsualMBase {
                             abi.encode(
                                 _mToken.PERMIT_TYPEHASH(),
                                 account_,
-                                address(_usualM),
+                                address(_swapFacility),
                                 amount_,
                                 nonce_,
                                 deadline_

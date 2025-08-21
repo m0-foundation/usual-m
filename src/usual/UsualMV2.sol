@@ -17,6 +17,7 @@ import { IERC20Metadata } from "../../lib/openzeppelin-contracts/contracts/token
 import { IMTokenLike } from "./interfaces/IMTokenLike.sol";
 import { IWrappedMLike } from "./interfaces/IWrappedMLike.sol";
 import { IRegistryAccess } from "./interfaces/IRegistryAccess.sol";
+import { ISwapFacilityLike } from "./interfaces/ISwapFacilityLike.sol";
 import { IUsualMV2 } from "./interfaces/IUsualMV2.sol";
 
 import {
@@ -48,6 +49,8 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
         // 4th slot
         address mToken;
         // 5th slot
+        address swapFacility;
+        // 6th slot
         address yieldRecipient;
     }
 
@@ -69,6 +72,14 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
         }
     }
 
+    /* ============ Modifiers ============ */
+
+    /// @dev Modifier to check if caller is SwapFacility.
+    modifier onlySwapFacility() {
+        if (msg.sender != _usualMStorageV0().swapFacility) revert NotSwapFacility();
+        _;
+    }
+
     /* ============ Constructor ============ */
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -82,17 +93,20 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
      * @custom:oz-upgrades-validate-as-initializer
      * @notice Initializes the UsualMV2 contract.
      * @param  mToken_         The address of the M token.
+     * @param  swapFacility_   The address of a Swap Facility.
      * @param  yieldRecipient_ The address of a yield destination.
      * @dev    Initializes the contract and performs the migration from WrappedM to M.
      */
-    function initializeV2(address mToken_, address yieldRecipient_) public reinitializer(2) {
+    function initializeV2(address mToken_, address swapFacility_, address yieldRecipient_) public reinitializer(2) {
         if (mToken_ == address(0)) revert ZeroMToken();
+        if (swapFacility_ == address(0)) revert ZeroSwapFacility();
 
         __ERC20_init("UsualM", "USUALM");
         __ERC20Pausable_init();
         __ERC20Permit_init("UsualM");
 
         _usualMStorageV0().mToken = mToken_;
+        _usualMStorageV0().swapFacility = swapFacility_;
 
         UsualMStorageV0 storage $ = _usualMStorageV0();
 
@@ -126,32 +140,15 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
     }
 
     /// @inheritdoc IUsualMV2
-    function wrap(address recipient, uint256 amount) external returns (uint256) {
+    function wrap(address recipient, uint256 amount) external onlySwapFacility returns (uint256) {
         if (amount == 0) revert InvalidAmount();
 
         return _wrap(msg.sender, recipient, amount);
     }
 
     /// @inheritdoc IUsualMV2
-    function wrapWithPermit(
-        address recipient,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external returns (uint256) {
-        if (amount == 0) revert InvalidAmount();
-
-        // NOTE: `permit` call failures can be safely ignored to remove the risk of transactions being reverted due to front-run.
-        try IMTokenLike(mToken()).permit(msg.sender, address(this), amount, deadline, v, r, s) {} catch {}
-
-        return _wrap(msg.sender, recipient, amount);
-    }
-
-    /// @inheritdoc IUsualMV2
-    function unwrap(address recipient, uint256 amount) external returns (uint256) {
-        return _unwrap(msg.sender, recipient, amount);
+    function unwrap(address /* recipient */, uint256 amount) external onlySwapFacility returns (uint256) {
+        return _unwrap(ISwapFacilityLike(msg.sender).msgSender(), msg.sender, amount);
     }
 
     /* ============ Special Admin Functions ============ */
@@ -290,6 +287,11 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
     }
 
     /// @inheritdoc IUsualMV2
+    function swapFacility() public view returns (address) {
+        return _usualMStorageV0().swapFacility;
+    }
+
+    /// @inheritdoc IUsualMV2
     function yield() public view returns (uint256) {
         unchecked {
             uint256 balance_ = IMTokenLike(mToken()).balanceOf(address(this));
@@ -303,6 +305,7 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
     function yieldRecipient() public view returns (address) {
         return _usualMStorageV0().yieldRecipient;
     }
+
     /* ============ Internal Interactive Functions ============ */
 
     /**
@@ -336,11 +339,11 @@ contract UsualMV2 is ERC20PausableUpgradeable, ERC20PermitUpgradeable, IUsualMV2
 
         UsualMStorageV0 storage $ = _usualMStorageV0();
 
-        // Check that caller has a valid access role before proceeding.
-        if (!IRegistryAccess($.registryAccess).hasRole(USUAL_M_UNWRAP, msg.sender)) revert NotAuthorized();
+        // Check that account has a valid access role before proceeding.
+        if (!IRegistryAccess($.registryAccess).hasRole(USUAL_M_UNWRAP, account)) revert NotAuthorized();
 
-        // NOTE: Burn precise `amount` of UsualM token from `account`.
-        _burn(account, amount);
+        // NOTE: Burn precise `amount` of UsualM token from SwapFacility as it is the only contract that can call this function.
+        _burn(msg.sender, amount);
 
         // NOTE: The behavior of `IMTokenLike.transfer` is known, so its return can be ignored.
         // NOTE: Transfer amount of $M to `recipient` and decrease $M balance of the UsualM contract accordingly.

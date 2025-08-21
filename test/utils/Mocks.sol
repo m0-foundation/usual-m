@@ -2,12 +2,22 @@
 
 pragma solidity 0.8.26;
 
+import { IERC20 } from "../../lib/forge-std/src/interfaces/IERC20.sol";
+
+import { IMExtensionLike } from "./IMExtensionLike.sol";
+
 contract MockMToken {
+    mapping(address account => mapping(address spender => uint256)) public allowances;
     mapping(address account => uint256 balance) public balanceOf;
     mapping(address account => bool isEarning) public isEarning;
     mapping(address account => uint240 principal) public principalBalanceOf;
 
     uint256 public currentIndex;
+
+    function approve(address spender, uint256 value) public virtual returns (bool) {
+        allowances[msg.sender][spender] = value;
+        return true;
+    }
 
     function permit(
         address owner,
@@ -155,5 +165,29 @@ contract MockNavOracle {
 
     function latestRoundData() external view returns (uint80, int256, uint256, uint256, uint80) {
         return (_roundId, _navPrice, _startedAt, _updatedAt, _answeredInRound);
+    }
+}
+
+contract MockSwapFacility {
+    address public immutable mToken;
+
+    constructor(address mToken_) {
+        mToken = mToken_;
+    }
+
+    function swapInM(address extensionOut, uint256 amount, address recipient) external {
+        IERC20(mToken).transferFrom(msg.sender, address(this), amount);
+        IERC20(mToken).approve(extensionOut, amount);
+        IMExtensionLike(extensionOut).wrap(recipient, amount);
+    }
+
+    function swapOutM(address extensionIn, uint256 amount, address recipient) external {
+        IERC20(extensionIn).transferFrom(msg.sender, address(this), amount);
+
+        uint256 balanceBefore = IERC20(mToken).balanceOf(address(this));
+        IMExtensionLike(extensionIn).unwrap(address(this), amount);
+
+        amount = IERC20(mToken).balanceOf(address(this)) - balanceBefore;
+        IERC20(mToken).transfer(recipient, amount);
     }
 }
