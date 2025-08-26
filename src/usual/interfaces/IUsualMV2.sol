@@ -69,16 +69,23 @@ interface IUsualMV2 is IERC20Metadata {
     /// @notice Emitted if no yield is available to claim.
     error NoYield();
 
+    /// @notice Emitted in `wrap` and `unwrap` functions if the caller is not the SwapFacility.
+    error NotSwapFacility();
+
     /// @notice Emitted if M Token is 0x0.
     error ZeroMToken();
 
-    /// @notice Emitted in constructor if Yield Recipient is 0x0.
+    /// @notice Emitted if SwapFacility is 0x0.
+    error ZeroSwapFacility();
+
+    /// @notice Emitted if Yield Recipient is 0x0.
     error ZeroYieldRecipient();
 
     /* ============ Interactive Functions ============ */
 
     /**
      * @notice Wraps `amount` M from the caller into UsualM for `recipient`.
+     * @dev    MUST only be called by the Swap Facility contract.
      * @param  recipient The account receiving the minted UsualM.
      * @param  amount    The amount of M deposited.
      * @return The amount of UsualM minted.
@@ -86,26 +93,8 @@ interface IUsualMV2 is IERC20Metadata {
     function wrap(address recipient, uint256 amount) external returns (uint256);
 
     /**
-     * @notice Wraps `amount` M from the caller into UsualM for `recipient`, using a permit.
-     * @param  recipient The account receiving the minted UsualM.
-     * @param  amount    The amount of M deposited.
-     * @param  deadline  The last timestamp where the signature is still valid.
-     * @param  v         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-     * @param  r         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-     * @param  s         An ECDSA secp256k1 signature parameter (EIP-2612 via EIP-712).
-     * @return The amount of UsualM minted.
-     */
-    function wrapWithPermit(
-        address recipient,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external returns (uint256);
-
-    /**
      * @notice Unwraps `amount` UsualM from the caller into M for `recipient`.
+     * @dev    MUST only be called by the Swap Facility contract.
      * @param  recipient The account receiving the withdrawn M.
      * @param  amount    The amount of UsualM burned.
      * @return The amount of WrappedM tokens withdrawn.
@@ -183,6 +172,9 @@ interface IUsualMV2 is IERC20Metadata {
 
     /// @notice Returns the M token address.
     function mToken() external view returns (address);
+
+    /// @notice The address of the Swap Facility contract
+    function swapFacility() external view returns (address);
 
     /// @notice The amount of accrued yield.
     function yield() external view returns (uint256);

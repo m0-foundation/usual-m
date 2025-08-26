@@ -3,12 +3,16 @@
 pragma solidity 0.8.26;
 
 import { Test } from "../../../lib/forge-std/src/Test.sol";
+import { IERC20 } from "../../../lib/forge-std/src/interfaces/IERC20.sol";
+
 import { Pausable } from "../../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
 
 import { Upgrades } from "../../../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 import { Options } from "../../../lib/openzeppelin-foundry-upgrades/src/Options.sol";
 
-import { MockMToken, MockRegistryAccess, MockWrappedM } from "../../utils/Mocks.sol";
+import { ISwapFacilityLike } from "../../../src/usual/interfaces/ISwapFacilityLike.sol";
+
+import { MockMToken, MockRegistryAccess, MockSwapFacility, MockWrappedM } from "../../utils/Mocks.sol";
 
 import {
     DEFAULT_ADMIN_ROLE,
@@ -51,6 +55,7 @@ contract UsualMV2UnitTests is Test {
     MockWrappedM internal _wrappedM;
     MockMToken internal _mToken;
     MockRegistryAccess internal _registryAccess;
+    MockSwapFacility internal _swapFacility;
 
     UsualM internal _usualM;
     UsualMV2 internal _usualMV2;
@@ -61,6 +66,7 @@ contract UsualMV2UnitTests is Test {
         _wrappedM = new MockWrappedM();
         _mToken = new MockMToken();
         _registryAccess = new MockRegistryAccess();
+        _swapFacility = new MockSwapFacility(address(_mToken));
 
         // Set default admin role.
         _registryAccess.grantRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -79,7 +85,7 @@ contract UsualMV2UnitTests is Test {
         Upgrades.upgradeProxy(
             usualM_,
             "UsualMV2.sol:UsualMV2",
-            abi.encodeCall(UsualMV2.initializeV2, (address(_mToken), _yieldRecipient)),
+            abi.encodeCall(UsualMV2.initializeV2, (address(_mToken), address(_swapFacility), _yieldRecipient)),
             opts,
             _admin
         );
@@ -124,6 +130,7 @@ contract UsualMV2UnitTests is Test {
         assertEq(_usualMV2.decimals(), 6);
         assertEq(_usualMV2.registryAccess(), address(_registryAccess));
         assertEq(_usualMV2.mToken(), address(_mToken));
+        assertEq(_usualMV2.swapFacility(), address(_swapFacility));
         assertEq(_usualMV2.yieldRecipient(), _yieldRecipient);
     }
 
@@ -136,8 +143,7 @@ contract UsualMV2UnitTests is Test {
     function test_claimYield() external {
         _mToken.setBalanceOf(_alice, 1_000);
 
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 1_000);
+        _wrap(_alice, _alice, 1_000);
 
         _mToken.setBalanceOf(address(_usualMV2), _usualMV2.totalSupply() + 500);
 
@@ -159,8 +165,7 @@ contract UsualMV2UnitTests is Test {
 
     /* ============ wrap ============ */
     function test_wrap_wholeBalance() external {
-        vm.prank(_alice);
-        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         assertEq(_mToken.balanceOf(_alice), 0);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 10e6);
@@ -169,8 +174,7 @@ contract UsualMV2UnitTests is Test {
     }
 
     function test_wrap() external {
-        vm.prank(_alice);
-        assertEq(_usualMV2.wrap(_alice, 5e6), 5e6);
+        _wrap(_alice, _alice, 5e6);
 
         assertEq(_mToken.balanceOf(_alice), 5e6);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 5e6);
@@ -178,32 +182,23 @@ contract UsualMV2UnitTests is Test {
         assertEq(_usualMV2.balanceOf(_alice), 5e6);
     }
 
-    function test_wrapWithPermit() external {
-        vm.prank(_bob);
-        assertEq(_usualMV2.wrapWithPermit(_alice, 5e6, 0, 0, bytes32(0), bytes32(0)), 5e6);
-
-        assertEq(_mToken.balanceOf(_alice), 10e6);
-        assertEq(_mToken.balanceOf(address(_usualMV2)), 5e6);
-        assertEq(_usualMV2.balanceOf(_alice), 5e6);
-
-        assertEq(_usualMV2.balanceOf(_bob), 0);
-    }
-
-    function test_wrapWithPermit_invalidAmount() external {
-        vm.expectRevert(IUsualMV2.InvalidAmount.selector);
-
-        vm.prank(_bob);
-        _usualMV2.wrapWithPermit(_alice, 0, 0, 0, bytes32(0), bytes32(0));
-    }
-
     function test_wrap_exceedsMintCap() external {
         vm.prank(_mintCapAllocator);
         _usualMV2.setMintCap(5e6);
 
+        vm.prank(_alice);
+        IERC20(address(_mToken)).approve(address(_swapFacility), 10e6);
+
+        vm.mockCall(
+            address(_swapFacility),
+            abi.encodeWithSelector(ISwapFacilityLike.msgSender.selector),
+            abi.encode(_alice)
+        );
+
         vm.expectRevert(IUsualMV2.MintCapExceeded.selector);
 
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _swapFacility.swapInM(address(_usualMV2), 10e6, _alice);
     }
 
     function test_wrap_upToMintCap() external {
@@ -211,25 +206,38 @@ contract UsualMV2UnitTests is Test {
         _usualMV2.setMintCap(15e6);
 
         // First wrap should succeed
-        vm.prank(_alice);
-        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         // Second wrap should succeed (within cap)
-        vm.prank(_bob);
-        assertEq(_usualMV2.wrap(_bob, 5e6), 5e6);
+        _wrap(_bob, _bob, 5e6);
+
+        vm.prank(_charlie);
+        _usualMV2.approve(address(_swapFacility), 1e6);
+
+        vm.mockCall(
+            address(_swapFacility),
+            abi.encodeWithSelector(ISwapFacilityLike.msgSender.selector),
+            abi.encode(_charlie)
+        );
 
         // Third wrap should fail (exceeds cap)
         vm.expectRevert(IUsualMV2.MintCapExceeded.selector);
 
         vm.prank(_charlie);
-        _usualMV2.wrap(_charlie, 1e6);
+        _swapFacility.swapInM(address(_usualMV2), 1e6, _charlie);
     }
 
     function test_wrap_invalidAmount() external {
         vm.expectRevert(IUsualMV2.InvalidAmount.selector);
 
+        vm.mockCall(
+            address(_swapFacility),
+            abi.encodeWithSelector(ISwapFacilityLike.msgSender.selector),
+            abi.encode(_alice)
+        );
+
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 0);
+        _swapFacility.swapInM(address(_usualMV2), 0, _alice);
     }
 
     function testFuzz_wrap_withMintCap(uint256 mintCap, uint256 wrapAmount) external {
@@ -242,8 +250,7 @@ contract UsualMV2UnitTests is Test {
         _mToken.setBalanceOf(_alice, wrapAmount);
 
         // Wrap tokens up to the mint cap
-        vm.prank(_alice);
-        assertEq(_usualMV2.wrap(_alice, wrapAmount), wrapAmount);
+        _wrap(_alice, _alice, wrapAmount);
 
         // Check that the total supply does not exceed the mint cap
         assertLe(_usualMV2.totalSupply(), mintCap);
@@ -254,11 +261,8 @@ contract UsualMV2UnitTests is Test {
 
     /* ============ unwrap ============ */
     function test_unwrap() external {
-        vm.prank(_alice);
-        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
-
-        vm.prank(_alice);
-        _usualMV2.unwrap(_alice, 5e6);
+        _wrap(_alice, _alice, 10e6);
+        _unwrap(_alice, _alice, 5e6);
 
         assertEq(_mToken.balanceOf(_alice), 5e6);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 5e6);
@@ -267,15 +271,13 @@ contract UsualMV2UnitTests is Test {
     }
 
     function test_unwrap_wholeBalance() external {
-        vm.prank(_alice);
-        assertEq(_usualMV2.wrap(_alice, 10e6), 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         assertEq(_mToken.balanceOf(_alice), 0);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 10e6);
         assertEq(_usualMV2.balanceOf(_alice), 10e6);
 
-        vm.prank(_alice);
-        assertEq(_usualMV2.unwrap(_alice, 10e6), 10e6);
+        _unwrap(_alice, _alice, 10e6);
 
         assertEq(_mToken.balanceOf(_alice), 10e6);
         assertEq(_mToken.balanceOf(address(_usualMV2)), 0);
@@ -284,17 +286,35 @@ contract UsualMV2UnitTests is Test {
     }
 
     function test_unwrap_notAllowed() external {
+        _mToken.setBalanceOf(_other, 5e6);
+        _wrap(_other, _other, 5e6);
+
+        vm.prank(_other);
+        _usualMV2.approve(address(_swapFacility), 5e6);
+
+        vm.mockCall(
+            address(_swapFacility),
+            abi.encodeWithSelector(ISwapFacilityLike.msgSender.selector),
+            abi.encode(_other)
+        );
+
         vm.expectRevert(IUsualMV2.NotAuthorized.selector);
 
         vm.prank(_other);
-        _usualMV2.unwrap(_other, 5e6);
+        _swapFacility.swapOutM(address(_usualMV2), 5e6, _alice);
     }
 
     function test_unwrap_invalidAmount() external {
+        vm.mockCall(
+            address(_swapFacility),
+            abi.encodeWithSelector(ISwapFacilityLike.msgSender.selector),
+            abi.encode(_alice)
+        );
+
         vm.expectRevert(IUsualMV2.InvalidAmount.selector);
 
         vm.prank(_alice);
-        _usualMV2.unwrap(_alice, 0);
+        _swapFacility.swapOutM(address(_usualMV2), 0, _alice);
     }
 
     /* ============ pause ============ */
@@ -302,10 +322,13 @@ contract UsualMV2UnitTests is Test {
         vm.prank(_pauser);
         _usualMV2.pause();
 
+        vm.prank(_alice);
+        _usualMV2.approve(address(_swapFacility), 10e6);
+
         vm.expectRevert(Pausable.EnforcedPause.selector);
 
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _swapFacility.swapInM(address(_usualMV2), 10e6, _alice);
     }
 
     function test_pause_transfer() external {
@@ -319,16 +342,18 @@ contract UsualMV2UnitTests is Test {
     }
 
     function test_pause_unwrap() external {
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         vm.prank(_pauser);
         _usualMV2.pause();
 
+        vm.prank(_alice);
+        _usualMV2.approve(address(_swapFacility), 10e6);
+
         vm.expectRevert(Pausable.EnforcedPause.selector);
 
         vm.prank(_alice);
-        _usualMV2.unwrap(_bob, 10e6);
+        _swapFacility.swapOutM(address(_usualMV2), 10e6, _alice);
     }
 
     function test_pause_unauthorized() external {
@@ -354,32 +379,36 @@ contract UsualMV2UnitTests is Test {
 
         assertEq(_usualMV2.isBlacklisted(_alice), true);
 
+        vm.prank(_alice);
+        IERC20(address(_mToken)).approve(address(_swapFacility), 10e6);
+
         vm.expectRevert(IUsualMV2.Blacklisted.selector);
 
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _swapFacility.swapInM(address(_usualMV2), 10e6, _alice);
     }
 
     function test_blacklisted_unwrap() external {
         assertEq(_usualMV2.isBlacklisted(_alice), false);
 
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         vm.prank(_blacklister);
         _usualMV2.blacklist(_alice);
 
         assertEq(_usualMV2.isBlacklisted(_alice), true);
 
+        vm.prank(_alice);
+        _usualMV2.approve(address(_swapFacility), 10e6);
+
         vm.expectRevert(IUsualMV2.Blacklisted.selector);
 
         vm.prank(_alice);
-        _usualMV2.unwrap(_alice, 10e6);
+        _swapFacility.swapOutM(address(_usualMV2), 10e6, _alice);
     }
 
     function test_blacklisted_transfer_sender() external {
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         vm.prank(_blacklister);
         _usualMV2.blacklist(_alice);
@@ -391,8 +420,7 @@ contract UsualMV2UnitTests is Test {
     }
 
     function test_blacklisted_transfer_receiver() external {
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         vm.prank(_blacklister);
         _usualMV2.blacklist(_bob);
@@ -423,18 +451,20 @@ contract UsualMV2UnitTests is Test {
 
         assertEq(_usualMV2.isBlacklisted(_alice), true);
 
+        vm.prank(_alice);
+        IERC20(address(_mToken)).approve(address(_swapFacility), 10e6);
+
         vm.expectRevert(IUsualMV2.Blacklisted.selector);
 
         vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _swapFacility.swapInM(address(_usualMV2), 10e6, _alice);
 
         vm.prank(_blacklister);
         _usualMV2.unBlacklist(_alice);
 
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
-        assertEq(_usualMV2.balanceOf(_alice), 10e6);
+        _wrap(_alice, _alice, 10e6);
 
+        assertEq(_usualMV2.balanceOf(_alice), 10e6);
         assertEq(_usualMV2.isBlacklisted(_alice), false);
     }
 
@@ -565,11 +595,8 @@ contract UsualMV2UnitTests is Test {
         _mToken.setBalanceOf(_alice, 1_000);
         _mToken.setBalanceOf(_bob, 1_000);
 
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 1_000);
-
-        vm.prank(_bob);
-        _usualMV2.wrap(_bob, 1_000);
+        _wrap(_alice, _alice, 1_000);
+        _wrap(_bob, _bob, 1_000);
 
         assertEq(_usualMV2.yield(), 0);
 
@@ -587,13 +614,34 @@ contract UsualMV2UnitTests is Test {
         assertEq(_usualMV2.getWrappableAmount(100e6), 100e6);
 
         // Wrap some tokens
-        vm.prank(_alice);
-        _usualMV2.wrap(_alice, 10e6);
+        _wrap(_alice, _alice, 10e6);
 
         // Check wrappable amount with amount exceeding difference between mint cap and total supply
         assertEq(_usualMV2.getWrappableAmount(100e6), 90e6);
 
         // Check wrappable amount with amount less than difference between mint cap and total supply
         assertEq(_usualMV2.getWrappableAmount(20e6), 20e6);
+    }
+
+    function _wrap(address account_, address recipient_, uint256 amount_) internal {
+        vm.prank(account_);
+        IERC20(address(_mToken)).approve(address(_swapFacility), amount_);
+
+        vm.prank(account_);
+        _swapFacility.swapInM(address(_usualMV2), amount_, recipient_);
+    }
+
+    function _unwrap(address account_, address recipient_, uint256 amount_) internal {
+        vm.prank(account_);
+        _usualMV2.approve(address(_swapFacility), amount_);
+
+        vm.mockCall(
+            address(_swapFacility),
+            abi.encodeWithSelector(ISwapFacilityLike.msgSender.selector),
+            abi.encode(account_)
+        );
+
+        vm.prank(account_);
+        _swapFacility.swapOutM(address(_usualMV2), amount_, recipient_);
     }
 }
