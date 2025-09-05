@@ -28,6 +28,8 @@ contract UsualMV2 is UsualM, V2 {}
 
 contract UsualMIntegrationTests is TestBase {
     function setUp() external {
+        mainnetFork = vm.createSelectFork(vm.rpcUrl("mainnet"), 21_719_303);
+
         _deployComponents();
         _fundAccounts();
         _grantRoles();

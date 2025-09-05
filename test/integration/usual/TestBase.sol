@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.26;
 
-import { Test, console2 } from "../../../lib/forge-std/src/Test.sol";
+import { Test } from "../../../lib/forge-std/src/Test.sol";
 import {
     TransparentUpgradeableProxy
 } from "../../../lib/openzeppelin-contracts/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -14,9 +14,16 @@ import { IRegistryAccess } from "../../../src/usual/interfaces/IRegistryAccess.s
 
 import { UsualM } from "../../../src/usual/UsualM.sol";
 
-import { USUAL_M_UNWRAP, USUAL_M_PAUSE, USUAL_M_UNPAUSE, USUAL_M_MINTCAP_ALLOCATOR } from "../../../src/usual/constants.sol";
+import {
+    USUAL_M_UNWRAP,
+    USUAL_M_PAUSE,
+    USUAL_M_UNPAUSE,
+    USUAL_M_MINTCAP_ALLOCATOR
+} from "../../../src/usual/constants.sol";
 
 contract TestBase is Test {
+    uint256 public mainnetFork;
+
     address internal constant _standardGovernor = 0xB024aC5a7c6bC92fbACc8C3387E628a07e1Da016;
     address internal constant _registrar = 0x119FbeeDD4F4f4298Fb59B720d5654442b81ae2c;
 
@@ -29,8 +36,8 @@ contract TestBase is Test {
     address internal constant _wrappedMSource = 0x970A7749EcAA4394C8B2Bf5F2471F41FD6b79288;
 
     IRegistryAccess internal constant _registryAccess = IRegistryAccess(0x0D374775E962c3608B8F0A4b8B10567DF739bb56);
-    address internal _admin = _registryAccess.defaultAdmin();
 
+    address internal _admin = _registryAccess.defaultAdmin();
     address internal _treasury = makeAddr("treasury");
 
     address internal _alice = makeAddr("alice");
@@ -101,11 +108,13 @@ contract TestBase is Test {
 
     function _deployComponents() internal {
         _usualMImplementation = address(new UsualM());
+
         bytes memory usualMData = abi.encodeWithSignature(
             "initialize(address,address)",
             address(_wrappedM),
             _registryAccess
         );
+
         _usualM = IUsualM(address(new TransparentUpgradeableProxy(_usualMImplementation, _admin, usualMData)));
     }
 

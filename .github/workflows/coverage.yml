@@ -23,6 +23,10 @@ jobs:
       - name: Install lcov
         uses: hrishikesh-kadam/setup-lcov@v1
 
+      - name: Run Forge build
+        run: forge build
+        id: build
+      
       - name: Run coverage
         env:
           MNEMONIC: ${{ secrets.MNEMONIC_FOR_TESTS }}
@@ -32,7 +36,7 @@ jobs:
         id: coverage
 
       - name: Report code coverage
-        uses: zgosalvez/github-actions-report-lcov@v3
+        uses: zgosalvez/github-actions-report-lcov@v4
         with:
           coverage-files: lcov.info
           artifact-name: code-coverage-report
